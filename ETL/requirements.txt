@@ -1,0 +1,10 @@
+selenium
+beautifulsoup4
+pylint
+pytest
+pytest-cov
+requests
+rich
+webdriver_manager
+psycopg2[binary]
+python-dotenv
