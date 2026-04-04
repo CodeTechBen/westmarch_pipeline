@@ -3,7 +3,10 @@ import logging
 import psycopg2
 import psycopg2.extensions
 
-def setup_logging(output: str = None, level=logging.INFO):
+class DatabaseException(Exception):
+    pass
+
+def setup_logging(output: str = None, level=logging.INFO): # type: ignore
     '''Sets up logging configuration for the extraction process.'''
     log_date_format = '%Y-%m-%d %H:%M:%S'
     log_format = '{asctime} - {levelname} - {message}'
@@ -37,7 +40,7 @@ def get_db_connection() -> psycopg2.extensions.connection:
         )
         logging.info("Database connection established successfully.")
         return conn
-    except Exception as e:
+    except DatabaseException as e:
         logging.error(f"Failed to connect to the database: {e}")
         raise
 
