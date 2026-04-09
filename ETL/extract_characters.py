@@ -8,11 +8,10 @@
 '''Extracts data from DND Beyond scraped from westmarches and prepares it for transformation and loading into the database.'''
 
 import re
-import json
 from datetime import datetime, timezone
 
 import logging
-from setup import setup_logging, get_db_connection # type: ignore
+from setup import setup_logging
 from os import environ as ENV
 from dotenv import load_dotenv
 
@@ -351,15 +350,12 @@ def get_latest_past_session(sessions: list[dict[str, any]]) -> dict[str, any]:
 
     return max(valid_sessions, key=lambda s: s["date"])
 
-def Extract():
+def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
     '''Main function to execute the extraction process.'''
     setup_logging()
     # conn = get_db_connection()
     logging.info("Database connection established.")
     players = get_characters_page(url=ENV['WESTMARCH_URL'])
-
-    with open('extract_players.json', 'w') as f:
-        json.dump(players, f, indent=2)
     
     players_out_dict = {}
     characters_out = []
@@ -495,4 +491,4 @@ def Extract():
     }
 
 if __name__ == "__main__":
-    Extract()
+    extract()
