@@ -17,7 +17,9 @@ BEGIN;
 
 CREATE TABLE player (
     player_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    player_name VARCHAR(100) NOT NULL UNIQUE,
+    player_name VARCHAR(100) NOT NULL,
+    discord_name VARCHAR(100) NOT NULL,
+    dnd_beyond_name VARCHAR(100) NOT NULL,
     join_date DATE NOT NULL DEFAULT CURRENT_DATE
 );
 
@@ -52,11 +54,13 @@ CREATE TABLE character (
     character_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     character_name VARCHAR(100) NOT NULL,
     character_description TEXT NOT NULL,
-    character_sheet_url VARCHAR(255) NOT NULL UNIQUE,
+    character_page_url VARCHAR(255),
+    dnd_beyond_id VARCHAR(100),
+    westmarch_id VARCHAR(100) NOT NULL UNIQUE,
     picture_url VARCHAR(255),
     player_id INT NOT NULL,
     race_id INT NOT NULL,
-    starting_level INT NOT NULL,
+    starting_level INT NOT NULL DEFAULT 1,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
     FOREIGN KEY (player_id) REFERENCES player(player_id),
@@ -81,6 +85,7 @@ CREATE TABLE character_class (
 CREATE TABLE session (
     session_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     session_name VARCHAR(100) NOT NULL,
+    session_url VARCHAR(255) NOT NULL UNIQUE,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
     level_tier INT NOT NULL,
     dm_player_id INT NOT NULL,
@@ -106,6 +111,8 @@ CREATE TABLE character_growth (
     gold INT NOT NULL DEFAULT 0,
     passive_perception INT NOT NULL,
     armor_class INT NOT NULL,
+    spell_slots JSONB NOT NULL DEFAULT '{}'::JSONB,
+    UNIQUE(character_id, session_id),
 
     FOREIGN KEY (character_id) REFERENCES character(character_id),
     FOREIGN KEY (session_id) REFERENCES session(session_id)
@@ -119,7 +126,9 @@ CREATE TABLE spell (
     school VARCHAR(50) NOT NULL,
     casting_time VARCHAR(50) NOT NULL,
     range VARCHAR(50) NOT NULL,
-    components TEXT,
+    damage VARCHAR(50),
+    consumes_material BOOLEAN NOT NULL DEFAULT FALSE,
+    material_components TEXT,
     duration VARCHAR(50) NOT NULL,
     is_concentration BOOLEAN NOT NULL DEFAULT FALSE,
     is_ritual BOOLEAN NOT NULL DEFAULT FALSE

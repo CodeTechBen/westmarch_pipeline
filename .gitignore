@@ -1,1 +1,5 @@
 .venv
+.env
+*.json
+*.txt
+*.html
