@@ -164,6 +164,47 @@ def load_subclasses(conn: psycopg2.extensions.connection, data: dict[str, list[d
             """, (subclass_name, subclass_info["description"], subclass_info["class_id"]))
     conn.commit()
 
+def get_sessions(conn: psycopg2.extensions.connection) -> dict[str, int]:
+    '''Returns a lookup map for sessions by name.'''
+    with conn.cursor() as cur:
+        cur.execute("SELECT session_id, session_name FROM session")
+        rows = cur.fetchall()
+
+    session_map = {name: id for id, name in rows}
+    logging.info(f"Loaded {len(rows)} sessions into lookup map.")
+
+    return session_map
+
+def load_sessions(conn: psycopg2.extensions.connection, data: dict[str, list[dict[str, any]]], discord_map: dict[str, int], player_name_map: dict[str, int], dnd_map: dict[str, int]):
+    '''Loads session data into the database.'''
+    session_map = get_sessions(conn)
+    player_map = get_players(conn)
+    unique_sessions = dict[str, str]() # type: ignore
+    sessions = data.get("sessions", [])
+    for session in sessions:
+        session_name = session.get("session_name")
+        session_date = session.get("date")
+        dm_name = session.get("dm_name")
+        dm_id = player_map[0].get(dm_name) if dm_name else None
+        if session_name and session_name not in unique_sessions:
+            unique_sessions[session_name] = {
+                "date": session_date,
+                "dm_id": dm_id,
+                "session_name": session_name
+            }
+
+    with conn.cursor() as cur:
+        for session_name, session_date, dm_id in unique_sessions.items():
+            logging.info(f"Loading session: {session_name}")
+            cur.execute("""
+                INSERT INTO session (session_name, date, dm_player_id)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (session_name) DO UPDATE SET
+                    date = EXCLUDED.date,
+                    dm_player_id = EXCLUDED.dm_player_id
+            """, (session_name, session_date, dm_id))
+    conn.commit()
+
 def load():
     '''Main function to execute the load process.'''
     setup_logging()
@@ -178,6 +219,8 @@ def load():
     load_classes(conn, data)
     class_map = get_classes(conn)
     load_subclasses(conn, data, class_map)
+    load_sessions(conn, data, discord_map, player_name_map, dnd_map)
+
     conn.close()
 
 

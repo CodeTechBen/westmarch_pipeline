@@ -84,9 +84,7 @@ CREATE TABLE character_class (
 CREATE TABLE session (
     session_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     session_name VARCHAR(100) NOT NULL,
-    session_url VARCHAR(255) NOT NULL UNIQUE,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
-    level_tier INT NOT NULL,
     dm_player_id INT NOT NULL,
 
     FOREIGN KEY (dm_player_id) REFERENCES player(player_id)
