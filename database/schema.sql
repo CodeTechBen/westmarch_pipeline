@@ -52,10 +52,9 @@ CREATE TABLE tag (
 CREATE TABLE character (
     character_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     character_name VARCHAR(100) NOT NULL,
-    character_description TEXT NOT NULL,
+    character_description TEXT,
     character_page_url VARCHAR(255),
     dnd_beyond_id VARCHAR(100),
-    westmarch_id VARCHAR(100) NOT NULL UNIQUE,
     picture_url VARCHAR(255),
     player_id INT NOT NULL,
     race_id INT NOT NULL,
@@ -83,9 +82,9 @@ CREATE TABLE character_class (
 
 CREATE TABLE session (
     session_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    session_name VARCHAR(100) NOT NULL,
+    session_name VARCHAR(100) UNIQUE NOT NULL,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
-    dm_player_id INT NOT NULL,
+    dm_player_id INT,
 
     FOREIGN KEY (dm_player_id) REFERENCES player(player_id)
 );

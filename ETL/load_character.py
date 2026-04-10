@@ -175,40 +175,310 @@ def get_sessions(conn: psycopg2.extensions.connection) -> dict[str, int]:
 
     return session_map
 
-def load_sessions(conn: psycopg2.extensions.connection, data: dict[str, list[dict[str, any]]], discord_map: dict[str, int], player_name_map: dict[str, int], dnd_map: dict[str, int]):
+def find_existing_player(player: dict[str, str], discord_map: dict[str, int], player_name_map: dict[str, int], dnd_map: dict[str, int]) -> int:
+    '''Finds an existing player ID using priority matching.'''
+
+    discord_name = player.get("discord_name")
+    player_name = player.get("name")
+    dnd_name = player.get("dnd_beyond_name")
+
+    if discord_name and discord_name in discord_map:
+        return discord_map[discord_name]
+
+    if player_name and player_name in player_name_map:
+        return player_name_map[player_name]
+
+    if dnd_name and dnd_name in dnd_map:
+        return dnd_map[dnd_name]
+
+    return None
+
+def load_sessions(
+    conn: psycopg2.extensions.connection,
+    data: dict[str, list[dict[str, any]]],
+    discord_map: dict[str, int],
+    player_name_map: dict[str, int],
+    dnd_map: dict[str, int]
+):
     '''Loads session data into the database.'''
-    session_map = get_sessions(conn)
-    player_map = get_players(conn)
-    unique_sessions = dict[str, str]() # type: ignore
+
     sessions = data.get("sessions", [])
+    unique_sessions: dict[str, dict[str, any]] = {}
     for session in sessions:
         session_name = session.get("session_name")
         session_date = session.get("date")
-        dm_name = session.get("dm_name")
-        dm_id = player_map[0].get(dm_name) if dm_name else None
+        dm = session.get("dm", {})
+
+        dm_player = {
+            "discord_name": dm.get("discord_name"),
+            "name": dm.get("player_name"),
+            "dnd_beyond_name": None  
+        }
+
+        dm_id = find_existing_player(
+            dm_player,
+            discord_map,
+            player_name_map,
+            dnd_map
+        )
+
         if session_name and session_name not in unique_sessions:
             unique_sessions[session_name] = {
                 "date": session_date,
-                "dm_id": dm_id,
-                "session_name": session_name
+                "dm_id": dm_id
             }
 
     with conn.cursor() as cur:
-        for session_name, session_date, dm_id in unique_sessions.items():
+        for session_name, session_data in unique_sessions.items():
             logging.info(f"Loading session: {session_name}")
+
             cur.execute("""
                 INSERT INTO session (session_name, date, dm_player_id)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (session_name) DO UPDATE SET
                     date = EXCLUDED.date,
                     dm_player_id = EXCLUDED.dm_player_id
-            """, (session_name, session_date, dm_id))
+            """, (
+                session_name,
+                session_data["date"],
+                session_data["dm_id"]
+            ))
+
     conn.commit()
+
+def get_characters(conn: psycopg2.extensions.connection) -> dict[str, int]:
+    '''Returns a lookup map for characters by name.'''
+    with conn.cursor() as cur:
+        cur.execute("SELECT character_id, character_name FROM character")
+        rows = cur.fetchall()
+
+    character_map = {name: id for id, name in rows}
+    logging.info(f"Loaded {len(rows)} characters into lookup map.")
+
+    return character_map
+
+def load_character(
+    conn: psycopg2.extensions.connection,
+    characters: list[dict[str, any]],
+    discord_map: dict[str, int],
+    player_name_map: dict[str, int],
+    dnd_map: dict[str, int]
+):
+    '''Loads character and character_class data into the database.'''
+
+    race_map = get_races(conn)
+    class_map = get_classes(conn)
+    subclass_map = get_subclasses(conn)
+
+    character_lookup = get_characters(conn)  # name -> id
+
+    with conn.cursor() as cur:
+
+        for character in characters:
+            character_name = character.get("character_name")
+            if not character_name:
+                continue
+
+            player_key = character.get("player_key")
+
+            player_obj = {
+                "discord_name": player_key,
+                "name": None,
+                "dnd_beyond_name": None
+            }
+
+            player_id = find_existing_player(
+                player_obj,
+                discord_map,
+                player_name_map,
+                dnd_map
+            )
+
+            if not player_id:
+                logging.warning(f"No player found for character {character_name}")
+                continue
+
+            race_name = character.get("race", {}).get("name")
+            race_id = race_map.get(race_name)
+
+            if not race_id:
+                logging.warning(f"Race not found: {race_name}")
+                continue
+
+            if character_name not in character_lookup:
+                cur.execute("""
+                    INSERT INTO character (
+                        character_name,
+                        character_page_url,
+                        dnd_beyond_id,
+                        player_id,
+                        race_id
+                    )
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING character_id
+                """, (
+                    character_name,
+                    character.get("character_page_url"),
+                    character.get("dnd_beyond_id"),
+                    player_id,
+                    race_id
+                ))
+
+                character_id = cur.fetchone()[0]
+                character_lookup[character_name] = character_id
+
+                logging.info(f"Inserted character: {character_name}")
+
+            else:
+                character_id = character_lookup[character_name]
+
+            for cls in character.get("classes", []):
+                class_name = cls.get("class_name")
+                subclass_name = cls.get("subclass_name")
+                level = cls.get("level", 1)
+
+                class_id = class_map.get(class_name)
+                subclass_id = subclass_map.get(subclass_name) if subclass_name else None
+
+                if not class_id:
+                    logging.warning(f"Class not found: {class_name}")
+                    continue
+
+                cur.execute("""
+                    INSERT INTO character_class (
+                        character_id,
+                        class_id,
+                        subclass_id,
+                        level
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (character_id, class_id) DO UPDATE SET
+                        subclass_id = EXCLUDED.subclass_id,
+                        level = EXCLUDED.level
+                """, (
+                    character_id,
+                    class_id,
+                    subclass_id,
+                    level
+                ))
+
+    conn.commit()
+    logging.info("Character data loaded successfully.")
+
+def attach_classes_to_characters(
+    characters: list[dict],
+    character_classes: list[dict]
+) -> list[dict]:
+    '''
+    Combines character data with their classes using character_key.
+    Returns characters with a "classes" field.
+    '''
+
+    character_map = {
+        c["character_key"]: c
+        for c in characters
+    }
+
+    class_map: dict[str, list[dict]] = {}
+
+    for cls in character_classes:
+        key = cls.get("character_key")
+
+        if not key:
+            continue
+
+        if key not in class_map:
+            class_map[key] = []
+
+        class_map[key].append({
+            "class_name": cls.get("class_name"),
+            "subclass_name": cls.get("subclass_name"),
+            "level": cls.get("level")
+        })
+
+    output = []
+
+    for key, character in character_map.items():
+        character_copy = character.copy()
+
+        character_copy["classes"] = class_map.get(key, [])
+
+        output.append(character_copy)
+
+    return output
+
+def load_character_classes(
+    conn,
+    characters: list[dict[str, any]]
+):
+    '''Loads character_class data into the database.'''
+
+    character_map = get_characters(conn)
+    class_map = get_classes(conn)
+    subclass_map = get_subclasses(conn)
+
+    with conn.cursor() as cur:
+
+        for character in characters:
+            character_name = character.get("character_name")
+            classes = character.get("classes", [])
+
+            if not character_name or not classes:
+                logging.warning(f"Missing character name or classes for character: {character}")
+                continue
+
+            character_id = character_map.get(character_name)
+
+            if not character_id:
+                logging.warning(f"Character not found in DB: {character_name}")
+                continue
+
+            for cls in classes:
+                class_name = cls.get("class_name")
+                subclass_name = cls.get("subclass_name")
+                level = cls.get("level", 1)
+
+                class_id = class_map.get(class_name)
+                subclass_id = subclass_map.get(subclass_name) if subclass_name else None
+
+                if not class_id:
+                    logging.warning(f"Class not found: {class_name}")
+                    continue
+
+                cur.execute("""
+                    INSERT INTO character_class (
+                        character_id,
+                        class_id,
+                        subclass_id,
+                        level
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (character_id, class_id)
+                    DO UPDATE SET
+                        subclass_id = EXCLUDED.subclass_id,
+                        level = EXCLUDED.level
+                """, (
+                    character_id,
+                    class_id,
+                    subclass_id,
+                    level
+                ))
+
+                logging.info(
+                    f"Loaded class for {character_name}: {class_name} ({subclass_name}) lvl {level}"
+                )
+
+    conn.commit()
+    logging.info("Character classes loaded successfully.")
 
 def load():
     '''Main function to execute the load process.'''
     setup_logging()
     data = extract()
+    data["characters"] = attach_classes_to_characters(
+    data["characters"],
+    data["character_class"]
+)
     logging.info("Data extraction completed. Starting load process.")
     conn = get_db_connection()
     load_players(conn, data["players"])
@@ -220,7 +490,9 @@ def load():
     class_map = get_classes(conn)
     load_subclasses(conn, data, class_map)
     load_sessions(conn, data, discord_map, player_name_map, dnd_map)
-
+    session_map = get_sessions(conn)
+    load_character(conn, data["characters"], discord_map, player_name_map, dnd_map)
+    load_character_classes(conn, data["characters"])
     conn.close()
 
 
