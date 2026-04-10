@@ -3,8 +3,8 @@
 # pyright: reportUnknownArgumentType=false
 
 '''Loads character data into the database.'''
-from .extract_characters import extract
-from .setup import get_db_connection, setup_logging
+from extract_characters import extract
+from setup import get_db_connection, setup_logging
 
 import psycopg2
 import logging
@@ -12,7 +12,7 @@ import logging
 def get_players(conn: psycopg2.extensions.connection) -> tuple[dict[str, int], dict[str, int], dict[str, int]]:
     '''Returns lookup maps for players by different identifiers.'''
     with conn.cursor() as cur:
-        cur.execute("SELECT id, discord_name, player_name, dnd_beyond_name FROM players")
+        cur.execute("SELECT player_id, discord_name, player_name, dnd_beyond_name FROM player")
         rows = cur.fetchall()
 
     discord_map = {}
@@ -38,19 +38,18 @@ def load_players(conn: psycopg2.extensions.connection, players):
     with conn.cursor() as cur:
         discord_map, player_name_map, dnd_map = get_players(conn)
         for player in players:
-            logging.info(f"Loading player: {player['name']}")
-            if player['name'] not in player_name_map and player['discord_name'] not in discord_map and player['dnd_beyond_name'] not in dnd_map:
-                logging.info(f"Player '{player['name']}' not found in database. Inserting new record.")
+            logging.info(f"Loading player: {player['player_name']}")
+            if player['player_name'] not in player_name_map and player['discord_name'] not in discord_map and player['dnd_beyond_name'] not in dnd_map:
                 cur.execute("""
-                    INSERT INTO players (player_name, discord_name, dnd_beyond_name)
+                    INSERT INTO player (player_name, discord_name, dnd_beyond_name)
                     VALUES (%s, %s, %s)
-                    ON CONFLICT (id) DO UPDATE SET
+                    ON CONFLICT (player_id) DO UPDATE SET
                         player_name = EXCLUDED.player_name,
                         discord_name = EXCLUDED.discord_name,
                         dnd_beyond_name = EXCLUDED.dnd_beyond_name
-                    RETURNING id, discord_name
+                    RETURNING player_id, discord_name
                 """, (
-                    player['name'],
+                    player['player_name'],
                     player['discord_name'],
                     player['dnd_beyond_name']
                 ))
@@ -61,7 +60,7 @@ def load_players(conn: psycopg2.extensions.connection, players):
 def get_races(conn: psycopg2.extensions.connection) -> dict[str, int]:
     '''Returns a lookup map for races by name.'''
     with conn.cursor() as cur:
-        cur.execute("SELECT race_id, name FROM race")
+        cur.execute("SELECT race_id, race_name FROM race")
         rows = cur.fetchall()
 
     race_map = {name: id for id, name in rows}
@@ -86,7 +85,7 @@ def load_races(conn: psycopg2.extensions.connection, data: dict[str, list[dict[s
         for race_name, race_description in unique_races.items():
             logging.info(f"Loading race: {race_name}")
             cur.execute("""
-                INSERT INTO races (race_name, race_description)
+                INSERT INTO race (race_name, race_description)
                 VALUES (%s, %s)
                 ON CONFLICT (race_name) DO UPDATE SET
                     race_description = EXCLUDED.race_description
@@ -120,7 +119,7 @@ def load_classes(conn: psycopg2.extensions.connection, data: dict[str, list[dict
         for class_name, class_description in unique_classes.items():
             logging.info(f"Loading class: {class_name}")
             cur.execute("""
-                INSERT INTO classes (class_name, class_description)
+                INSERT INTO class (class_name, class_description)
                 VALUES (%s, %s)
                 ON CONFLICT (class_name) DO UPDATE SET
                     class_description = EXCLUDED.class_description
@@ -136,7 +135,7 @@ def get_subclasses(conn: psycopg2.extensions.connection) -> dict[str, int]:
     subclass_map = {name: id for id, name in rows}
     return subclass_map
 
-def load_subclasses(conn: psycopg2.extensions.connection, data: dict[str, list[dict[str, any]]]):
+def load_subclasses(conn: psycopg2.extensions.connection, data: dict[str, list[dict[str, any]]], class_map: dict[str, int]):
     '''Loads subclass data into the database.'''
     subclass_map = get_subclasses(conn)
 
@@ -150,18 +149,19 @@ def load_subclasses(conn: psycopg2.extensions.connection, data: dict[str, list[d
             unique_subclasses[subclass_name] = {
                 "description": subclass_description,
                 "class_name": class_name,
+                "class_id": class_map.get(class_name)
             }
 
     with conn.cursor() as cur:
         for subclass_name, subclass_info in unique_subclasses.items():
             logging.info(f"Loading subclass: {subclass_name}")
             cur.execute("""
-                INSERT INTO subclasses (subclass_name, subclass_description, class_name)
+                INSERT INTO subclass (subclass_name, subclass_description, class_id)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (subclass_name) DO UPDATE SET
                     subclass_description = EXCLUDED.subclass_description,
-                    class_name = EXCLUDED.class_name
-            """, (subclass_name, subclass_info["description"], subclass_info["class_name"]))
+                    class_id = EXCLUDED.class_id
+            """, (subclass_name, subclass_info["description"], subclass_info["class_id"]))
     conn.commit()
 
 def load():
@@ -176,7 +176,8 @@ def load():
     logging.info("Player lookup maps created successfully.")
     load_races(conn, data)
     load_classes(conn, data)
-    load_subclasses(conn, data)
+    class_map = get_classes(conn)
+    load_subclasses(conn, data, class_map)
     conn.close()
 
 

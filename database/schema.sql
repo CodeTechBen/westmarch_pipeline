@@ -19,7 +19,7 @@ CREATE TABLE player (
     player_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     player_name VARCHAR(100) NOT NULL,
     discord_name VARCHAR(100) NOT NULL,
-    dnd_beyond_name VARCHAR(100) NOT NULL,
+    dnd_beyond_name VARCHAR(100),
     join_date DATE NOT NULL DEFAULT CURRENT_DATE
 );
 
@@ -32,13 +32,12 @@ CREATE TABLE race (
 CREATE TABLE class (
     class_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     class_name VARCHAR(100) NOT NULL UNIQUE,
-    hit_die INT NOT NULL,
     class_description TEXT NOT NULL
 );
 
 CREATE TABLE subclass (
     subclass_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    subclass_name VARCHAR(100) NOT NULL,
+    subclass_name VARCHAR(100) UNIQUE NOT NULL,
     subclass_description TEXT NOT NULL,
     class_id INT NOT NULL,
     UNIQUE(subclass_name, class_id),
