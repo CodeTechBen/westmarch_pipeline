@@ -52,6 +52,7 @@ CREATE TABLE tag (
 CREATE TABLE character (
     character_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     character_name VARCHAR(100) NOT NULL,
+    character_key TEXT UNIQUE,
     character_description TEXT,
     character_page_url VARCHAR(255),
     dnd_beyond_id VARCHAR(100),
@@ -107,7 +108,6 @@ CREATE TABLE character_growth (
     gold INT NOT NULL DEFAULT 0,
     passive_perception INT NOT NULL,
     armor_class INT NOT NULL,
-    spell_slots JSONB NOT NULL DEFAULT '{}'::JSONB,
     UNIQUE(character_id, session_id),
 
     FOREIGN KEY (character_id) REFERENCES character(character_id),

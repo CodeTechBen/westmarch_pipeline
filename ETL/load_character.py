@@ -249,10 +249,11 @@ def load_sessions(
 def get_characters(conn: psycopg2.extensions.connection) -> dict[str, int]:
     '''Returns a lookup map for characters by name.'''
     with conn.cursor() as cur:
-        cur.execute("SELECT character_id, character_name FROM character")
+        cur.execute("SELECT character_id, character_key FROM character")
         rows = cur.fetchall()
 
-    character_map = {name: id for id, name in rows}
+    character_map = {key: id for id, key in rows}
+    logging.info(f"{character_map}")
     logging.info(f"Loaded {len(rows)} characters into lookup map.")
 
     return character_map
@@ -270,13 +271,13 @@ def load_character(
     class_map = get_classes(conn)
     subclass_map = get_subclasses(conn)
 
-    character_lookup = get_characters(conn)  # name -> id
+    character_lookup = get_characters(conn)  # key -> id
 
     with conn.cursor() as cur:
 
         for character in characters:
-            character_name = character.get("character_name")
-            if not character_name:
+            character_key = character.get("character_key")
+            if not character_key:
                 continue
 
             player_key = character.get("player_key")
@@ -305,19 +306,25 @@ def load_character(
                 logging.warning(f"Race not found: {race_name}")
                 continue
 
-            if character_name not in character_lookup:
+            if character_key not in character_lookup:
                 cur.execute("""
                     INSERT INTO character (
+                        character_key,
                         character_name,
                         character_page_url,
                         dnd_beyond_id,
                         player_id,
                         race_id
                     )
-                    VALUES (%s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (character_key) DO UPDATE SET
+                        character_name = EXCLUDED.character_name,
+                        player_id = EXCLUDED.player_id,
+                        race_id = EXCLUDED.race_id
                     RETURNING character_id
                 """, (
-                    character_name,
+                    character.get("character_key"),
+                    character.get("character_name"),
                     character.get("character_page_url"),
                     character.get("dnd_beyond_id"),
                     player_id,
@@ -325,12 +332,11 @@ def load_character(
                 ))
 
                 character_id = cur.fetchone()[0]
-                character_lookup[character_name] = character_id
+                character_lookup[character.get("character_key")] = character_id
 
-                logging.info(f"Inserted character: {character_name}")
-
+                logging.info(f"Inserted character: {character.get('character_name')}")
             else:
-                character_id = character_lookup[character_name]
+                character_id = character_lookup[character.get("character_key")]
 
             for cls in character.get("classes", []):
                 class_name = cls.get("class_name")
@@ -471,28 +477,175 @@ def load_character_classes(
     conn.commit()
     logging.info("Character classes loaded successfully.")
 
+def build_character_key_lookup(
+    characters: list[dict],
+    conn
+) -> dict[str, int]:
+    '''
+    Maps character_key -> character_id using character_name as bridge.
+    '''
+
+    db_character_map = get_characters(conn)
+
+    lookup = {}
+
+    for c in characters:
+        key = c.get("character_key")
+        logging.info(f"Processing character for lookup: {key}")
+        name = c.get("character_name")
+        logging.info(f"Character name for lookup: {name}")
+
+        if not key or not name:
+            logging.warning(f"Missing key or name for character: {c}")
+            continue
+
+        character_id = db_character_map.get(key)
+
+        if not character_id:
+            logging.warning(f"Character not found in DB for key {key}: {name}")
+            continue
+
+        lookup[key] = character_id
+        logging.info(f"Character key lookup added: {key} -> {character_id}")
+
+    return lookup
+
+def build_session_key_lookup(
+    sessions: list[dict],
+    conn
+) -> dict[str, int]:
+    '''
+    Maps session_key -> session_id using session_name as bridge.
+    '''
+
+    # DB: session_name -> id
+    db_session_map = get_sessions(conn)
+
+    lookup = {}
+
+    for s in sessions:
+        key = s.get("session_key")
+        name = s.get("session_name")
+
+        if not key or not name:
+            continue
+
+        session_id = db_session_map.get(name)
+
+        if not session_id:
+            logging.warning(f"Session not found in DB for key {key}: {name}")
+            continue
+
+        lookup[key] = session_id
+
+    return lookup
+
+def load_character_growth(
+    conn,
+    characters: list[dict],
+    sessions: list[dict],
+    character_growth: list[dict]
+):
+    """Loads character growth data into the database."""
+
+    character_lookup = build_character_key_lookup(characters, conn)
+    session_lookup = build_session_key_lookup(sessions, conn)
+
+    with conn.cursor() as cur:
+
+        for growth in character_growth:
+
+            character_key = growth.get("character_key")
+            session_key = growth.get("session_key")
+
+            character_id = character_lookup.get(character_key)
+            session_id = session_lookup.get(session_key)
+
+            if character_id is None:
+                logging.warning(f"Missing character_id for key: {character_key}")
+                continue
+
+            if session_key and session_id is None:
+                logging.warning(f"Missing session_id for key: {session_key}")
+                continue
+
+            cur.execute("""
+                INSERT INTO character_growth (
+                    character_id,
+                    session_id,
+                    level,
+                    strength,
+                    dexterity,
+                    constitution,
+                    intelligence,
+                    wisdom,
+                    charisma,
+                    hit_points,
+                    gold,
+                    passive_perception,
+                    armor_class
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (character_id, session_id)
+                DO UPDATE SET
+                    level = EXCLUDED.level,
+                    strength = EXCLUDED.strength,
+                    dexterity = EXCLUDED.dexterity,
+                    constitution = EXCLUDED.constitution,
+                    intelligence = EXCLUDED.intelligence,
+                    wisdom = EXCLUDED.wisdom,
+                    charisma = EXCLUDED.charisma,
+                    hit_points = EXCLUDED.hit_points,
+                    gold = EXCLUDED.gold,
+                    passive_perception = EXCLUDED.passive_perception,
+                    armor_class = EXCLUDED.armor_class,
+                    time = CURRENT_TIMESTAMP
+            """, (
+                character_id,
+                session_id,
+                growth.get("level"),
+                growth.get("strength"),
+                growth.get("dexterity"),
+                growth.get("constitution"),
+                growth.get("intelligence"),
+                growth.get("wisdom"),
+                growth.get("charisma"),
+                growth.get("hit_points"),
+                growth.get("gold", 0),
+                growth.get("passive_perception"),
+                growth.get("armor_class")
+            ))
+
+    conn.commit()
+    logging.info("Character growths loaded successfully.")
+
 def load():
-    '''Main function to execute the load process.'''
     setup_logging()
+
     data = extract()
-    data["characters"] = attach_classes_to_characters(
-    data["characters"],
-    data["character_class"]
-)
-    logging.info("Data extraction completed. Starting load process.")
+
     conn = get_db_connection()
+
     load_players(conn, data["players"])
     discord_map, player_name_map, dnd_map = get_players(conn)
 
-    logging.info("Player lookup maps created successfully.")
     load_races(conn, data)
     load_classes(conn, data)
     class_map = get_classes(conn)
     load_subclasses(conn, data, class_map)
+
     load_sessions(conn, data, discord_map, player_name_map, dnd_map)
-    session_map = get_sessions(conn)
+
     load_character(conn, data["characters"], discord_map, player_name_map, dnd_map)
     load_character_classes(conn, data["characters"])
+
+    load_character_growth(
+        conn,
+        data["characters"],
+        data["sessions"],
+        data["character_growth"]
+    )
+
     conn.close()
 
 

@@ -76,7 +76,7 @@ def get_characters_page(url: str) -> dict[str, list[dict[str, str]]]: # type: ig
             "westmarch_url": full_url,
         })
 
-        return {"players": list(players.values())} # type: ignore
+    return {"players": list(players.values())} # type: ignore
 
 def get_character_sheet_link(soup: BeautifulSoup) -> str: # type: ignore
      '''Extracts character link from the DND Beyond character page.'''
@@ -476,6 +476,22 @@ def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
                     "character_key": character_key,
                     "spell_name": spell_name
                 })
+
+    with open('extracted_data.json', 'w') as f:
+        import json
+        json.dump({
+            "players": list(players_out_dict.values()),
+            "characters": characters_out,
+            "sessions": list(sessions_out.values()),
+            "character_growth": character_growth_out,
+            "character_class": character_class_out,
+            "inventory": inventory_out,
+            "spellbook": spellbook_out,
+            "spells": list(spells_out_dict.values()),
+            "items": list(items_out_dict.values()),
+            "classes": list(class_out_dict.values()),
+            "subclasses": list(subclass_out_dict.values())
+        }, f, indent=4)
 
     return {
         "players": list(players_out_dict.values()),
