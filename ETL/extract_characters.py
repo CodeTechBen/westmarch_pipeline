@@ -415,7 +415,8 @@ def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
                 if cls["subclass_name"] and cls["subclass_name"] not in subclass_out_dict:
                     subclass_out_dict[cls["subclass_name"]] = {
                         "subclass_name": cls["subclass_name"],
-                        "description": cls.get("subclass_description", "No description available.")
+                        "description": cls.get("subclass_description", "No description available."),
+                        "class_name": cls["class_name"]
                     }
 
                 character_class_out.append({
