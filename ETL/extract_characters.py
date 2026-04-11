@@ -353,7 +353,7 @@ def get_latest_past_session(sessions: list[dict[str, any]]) -> dict[str, any]:
 def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
     '''Main function to execute the extraction process.'''
     setup_logging()
-    # conn = get_db_connection()
+
     logging.info("Database connection established.")
     players = get_characters_page(url=ENV['WESTMARCH_URL'])
     
@@ -383,12 +383,12 @@ def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
         for character in player['characters']:
             character_key = character["westmarch_url"].split("/")[-1]
 
-            # --- scrape westmarch ---
+
             character_page = get_character_page(character['westmarch_url'])
             character['character_sheet'] = character_page['character_sheet']
             character['sessions'] = character_page['sessions']
 
-            # --- get dnd beyond ---
+
             dnd_info = get_dnd_beyond_info(character['character_sheet'])
             if dnd_info and not players_out_dict[player_key]["dnd_beyond_name"]:
                 players_out_dict[player_key]["dnd_beyond_name"] = dnd_info.get("player_name")
@@ -396,7 +396,7 @@ def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
             if not dnd_info:
                 continue
 
-            # --- CHARACTER ---
+
             characters_out.append({ 
                 "character_key": character_key,
                 "character_name": character["character_name"],
@@ -405,7 +405,7 @@ def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
                 "race": dnd_info["race"],
                 "player_key": player_key
             })
-            # --- CLASSES ---
+
             for cls in dnd_info["classes"]:
                 if cls["class_name"] not in class_out_dict:
                     class_out_dict[cls["class_name"]] = {
@@ -426,13 +426,12 @@ def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
                     "level": cls["level"]
                 })
 
-            # --- SESSIONS ---
+
             latest_session = get_latest_past_session(character["sessions"])
 
             if latest_session:
                 session_key = latest_session["session_url"].split("/")[-1]
 
-                # --- SESSIONS ---
                 if session_key not in sessions_out:
                     sessions_out[session_key] = {
                         "session_key": session_key,
@@ -441,7 +440,6 @@ def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
                         "dm_player_key": latest_session["dm"]["discord_name"]
                     }
 
-                # --- CHARACTER GROWTH ---
                 character_growth_out.append({
                     "character_key": character_key,
                     "session_key": session_key,
@@ -451,7 +449,6 @@ def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
                     "spell_slots": dnd_info["spell_slots"]
                 })
 
-            # --- INVENTORY ---
             for item in dnd_info["equipment"]:
                 if item["item_name"] not in items_out_dict:
                     items_out_dict[item["item_name"]] = item
@@ -463,35 +460,16 @@ def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
                     "tags": item["tags"]
                 })
 
-            # --- SPELLBOOK ---
             for spell in dnd_info["spells"]:
                 spell_name = spell["spell_name"]
 
-                # --- GLOBAL SPELL TABLE ---
                 if spell_name not in spells_out_dict:
                     spells_out_dict[spell_name] = spell
 
-                # --- SPELLBOOK (character ↔ spell) ---
                 spellbook_out.append({
                     "character_key": character_key,
                     "spell_name": spell_name
                 })
-
-    with open('extracted_data.json', 'w') as f:
-        import json
-        json.dump({
-            "players": list(players_out_dict.values()),
-            "characters": characters_out,
-            "sessions": list(sessions_out.values()),
-            "character_growth": character_growth_out,
-            "character_class": character_class_out,
-            "inventory": inventory_out,
-            "spellbook": spellbook_out,
-            "spells": list(spells_out_dict.values()),
-            "items": list(items_out_dict.values()),
-            "classes": list(class_out_dict.values()),
-            "subclasses": list(subclass_out_dict.values())
-        }, f, indent=4)
 
     return {
         "players": list(players_out_dict.values()),

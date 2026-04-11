@@ -140,12 +140,12 @@ CREATE TABLE spell_tag (
 
 CREATE TABLE spellbook (
     spellbook_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    character_id INT NOT NULL,
+    growth_id INT NOT NULL,
     spell_id INT NOT NULL,
 
-    UNIQUE(character_id, spell_id),
+    UNIQUE(growth_id, spell_id),
 
-    FOREIGN KEY (character_id) REFERENCES character(character_id),
+    FOREIGN KEY (growth_id) REFERENCES character_growth(growth_id),
     FOREIGN KEY (spell_id) REFERENCES spell(spell_id)
 );
 

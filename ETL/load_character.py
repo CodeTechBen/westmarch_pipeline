@@ -821,6 +821,37 @@ def load_inventory(conn, inventory, character_map):
             """, (growth_id, item_id, quantity))
     conn.commit()
 
+def load_spellbook(conn, spellbook, character_map):
+    '''Loads spellbook data into the database.'''
+    
+    with conn.cursor() as cur:
+        for entry in spellbook:
+            character_key = entry.get("character_key")
+            spell_name = entry.get("spell_name")
+
+            character_id = character_map.get(character_key)
+            growth_id = get_character_last_growth_id(character_id, conn)
+            if not character_id:
+                logging.warning(f"Character not found for spellbook entry: {character_key}")
+                continue
+
+            cur.execute("""
+                SELECT spell_id FROM spell WHERE spell_name = %s
+            """, (spell_name,))
+            result = cur.fetchone()
+
+            if not result:
+                logging.warning(f"Spell not found for spellbook entry: {spell_name}")
+                continue
+
+            spell_id = result[0]
+            logging.info(f"Loading spellbook for character {character_key}: {spell_name}")
+            cur.execute("""
+                INSERT INTO spellbook (growth_id, spell_id)
+                VALUES (%s, %s)
+                ON CONFLICT DO NOTHING
+            """, (growth_id, spell_id))
+    conn.commit()
 def load():
     setup_logging()
 
@@ -846,6 +877,7 @@ def load():
 
     load_character_classes(conn, characters_with_classes)
 
+
     load_character_growth(
         conn,
         data["characters"],
@@ -857,6 +889,7 @@ def load():
     load_spells(conn, data.get('spells'), get_tags(conn))
     load_items(conn, data.get('items'), get_tags(conn))
     load_inventory(conn, data.get('inventory', []), build_character_key_lookup(data["characters"], conn))
+    load_spellbook(conn, data.get('spellbook', []), build_character_key_lookup(data["characters"], conn))
     conn.close()
 
 
