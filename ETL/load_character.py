@@ -776,6 +776,51 @@ def load_items(conn, items, tag_map):
 
     conn.commit()
 
+def get_character_last_growth_id(character_id, conn):
+    '''Returns the most recent character_growth_id for a character.'''
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT growth_id FROM character_growth
+            WHERE character_id = %s
+            ORDER BY time DESC
+            LIMIT 1
+        """, (character_id,))
+        result = cur.fetchone()
+        return result[0] if result else None
+
+def load_inventory(conn, inventory, character_map):
+    '''Loads inventory data into the database.'''
+    with conn.cursor() as cur:
+        for entry in inventory:
+            character_key = entry.get("character_key")
+            item_name = entry.get("item_name")
+            quantity = entry.get("quantity", 1)
+
+            character_id = character_map.get(character_key)
+            growth_id = get_character_last_growth_id(character_id, conn)
+            if not character_id:
+                logging.warning(f"Character not found for inventory entry: {character_key}")
+                continue
+
+            cur.execute("""
+                SELECT item_id FROM item WHERE item_name = %s
+            """, (item_name,))
+            result = cur.fetchone()
+
+            if not result:
+                logging.warning(f"Item not found for inventory entry: {item_name}")
+                continue
+
+            item_id = result[0]
+            logging.info(f"Loading inventory for character {character_key}: {item_name} x{quantity}")
+            cur.execute("""
+                INSERT INTO inventory (growth_id, item_id, quantity)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (growth_id, item_id) DO UPDATE SET
+                    quantity = EXCLUDED.quantity
+            """, (growth_id, item_id, quantity))
+    conn.commit()
+
 def load():
     setup_logging()
 
@@ -811,7 +856,7 @@ def load():
     load_tags(conn, data.get('spells'), data.get('items'))
     load_spells(conn, data.get('spells'), get_tags(conn))
     load_items(conn, data.get('items'), get_tags(conn))
-
+    load_inventory(conn, data.get('inventory', []), build_character_key_lookup(data["characters"], conn))
     conn.close()
 
 
