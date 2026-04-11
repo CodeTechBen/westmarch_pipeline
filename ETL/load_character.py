@@ -253,7 +253,7 @@ def get_characters(conn: psycopg2.extensions.connection) -> dict[str, int]:
         rows = cur.fetchall()
 
     character_map = {key: id for id, key in rows}
-    logging.info(f"{character_map}")
+    # logging.info(f"{character_map}")
     logging.info(f"Loaded {len(rows)} characters into lookup map.")
 
     return character_map
@@ -296,7 +296,7 @@ def load_character(
             )
 
             if not player_id:
-                logging.warning(f"No player found for character {character_name}")
+                logging.warning(f"No player found for character {player_key}")
                 continue
 
             race_name = character.get("race", {}).get("name")
@@ -391,6 +391,7 @@ def attach_classes_to_characters(
         key = cls.get("character_key")
 
         if not key:
+            logging.warning(f"Missing character_key for class: {cls}")
             continue
 
         if key not in class_map:
@@ -426,14 +427,15 @@ def load_character_classes(
     with conn.cursor() as cur:
 
         for character in characters:
+            character_key = character.get("character_key")
             character_name = character.get("character_name")
             classes = character.get("classes", [])
 
-            if not character_name or not classes:
-                logging.warning(f"Missing character name or classes for character: {character}")
+            if not character_key or not classes:
+                logging.warning(f"Missing character key or classes for character: {character}")
                 continue
 
-            character_id = character_map.get(character_name)
+            character_id = character_map.get(character_key)
 
             if not character_id:
                 logging.warning(f"Character not found in DB: {character_name}")
@@ -619,6 +621,111 @@ def load_character_growth(
     conn.commit()
     logging.info("Character growths loaded successfully.")
 
+def get_tags(conn):
+    '''Returns a lookup map for tags by name.'''
+    with conn.cursor() as cur:
+        cur.execute("SELECT tag_id, tag_name FROM tag")
+        rows = cur.fetchall()
+
+    tag_map = {name: id for id, name in rows}
+    logging.info(f"Loaded {len(rows)} tags into lookup map.")
+
+    return tag_map
+
+def load_tags(conn, spells, items):
+    '''Loads tags for spells and items into the database.'''
+    tags = set()
+    for spell in spells or []:
+        for tag in spell.get("tags", []):
+            tags.add(tag)
+    for item in items or []:
+        for tag in item.get("tags", []):
+            tags.add(tag)
+
+    with conn.cursor() as cur:
+        for tag in tags:
+            logging.info(f"Loading tag: {tag}")
+            cur.execute("""
+                INSERT INTO tag (tag_name)
+                VALUES (%s)
+                ON CONFLICT (tag_name) DO NOTHING
+            """, (tag,))
+    conn.commit()
+    logging.info("Tags loaded successfully.")
+
+def load_spells(conn, spells, tag_map):
+    '''Loads spell data into the database.'''
+    with conn.cursor() as cur:
+        for spell in spells or []:
+            logging.info(f"Loading spell: {spell.get('spell_name')}")
+            range = spell.get("range")
+            if range.get("origin") == "self":
+                range_value = "Self"
+            else:
+                range_value = range.get("rangeValue")
+            
+            duration = spell.get("duration")
+            duration_value = " ".join([str(duration.get("durationInterval", "")), duration.get("durationUnit", "")]) if duration else None
+            cur.execute("""
+                INSERT INTO spell (
+                    spell_name,
+                    description,
+                    level,
+                    school,
+                    casting_time,
+                    range,
+                    damage,
+                    consumes_material,
+                    material_components,
+                    duration,
+                    is_concentration,
+                    is_ritual
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (spell_name) DO UPDATE SET
+                    description = EXCLUDED.description,
+                    level = EXCLUDED.level,
+                    school = EXCLUDED.school,
+                    casting_time = EXCLUDED.casting_time,
+                    range = EXCLUDED.range,
+                    damage = EXCLUDED.damage,
+                    consumes_material = EXCLUDED.consumes_material,
+                    material_components = EXCLUDED.material_components,
+                    duration = EXCLUDED.duration,
+                    is_concentration = EXCLUDED.is_concentration,
+                    is_ritual = EXCLUDED.is_ritual
+            """, (
+                spell.get("spell_name"),
+                spell.get("description"),
+                spell.get("level"),
+                spell.get("school"),
+                spell.get("casting_time"),
+                range_value,
+                spell.get("damage"),
+                spell.get("consumes_material", False),
+                spell.get("material_components"),
+                duration_value,
+                spell.get("is_concentration", False),
+                spell.get("is_ritual", False)
+            ))
+
+            cur.execute("""
+                SELECT spell_id FROM spell WHERE spell_name = %s
+            """, (spell.get("spell_name"),))
+            spell_id = cur.fetchone()[0]
+
+            for tag in spell.get("tags", []):
+                tag_id = tag_map.get(tag)
+                if tag_id:
+                    cur.execute("""
+                        INSERT INTO spell_tag (spell_id, tag_id)
+                        VALUES (%s, %s)
+                        ON CONFLICT DO NOTHING
+                    """, (spell_id, tag_id))
+
+    conn.commit()
+    logging.info("Spells loaded successfully.")
+
 def load():
     setup_logging()
 
@@ -637,7 +744,12 @@ def load():
     load_sessions(conn, data, discord_map, player_name_map, dnd_map)
 
     load_character(conn, data["characters"], discord_map, player_name_map, dnd_map)
-    load_character_classes(conn, data["characters"])
+    characters_with_classes = attach_classes_to_characters(
+    data["characters"],
+    data["character_class"]
+    )
+
+    load_character_classes(conn, characters_with_classes)
 
     load_character_growth(
         conn,
@@ -645,6 +757,10 @@ def load():
         data["sessions"],
         data["character_growth"]
     )
+
+    load_tags(conn, data.get('spells'), data.get('items'))
+    load_spells(conn, data.get('spells'), get_tags(conn))
+    load_items(conn, data.get('items'), get_tags(conn))
 
     conn.close()
 
