@@ -19,7 +19,7 @@ CREATE TABLE player (
     player_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     player_name VARCHAR(100) NOT NULL,
     discord_name VARCHAR(100) NOT NULL,
-    dnd_beyond_name VARCHAR(100) NOT NULL,
+    dnd_beyond_name VARCHAR(100),
     join_date DATE NOT NULL DEFAULT CURRENT_DATE
 );
 
@@ -32,13 +32,12 @@ CREATE TABLE race (
 CREATE TABLE class (
     class_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     class_name VARCHAR(100) NOT NULL UNIQUE,
-    hit_die INT NOT NULL,
     class_description TEXT NOT NULL
 );
 
 CREATE TABLE subclass (
     subclass_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    subclass_name VARCHAR(100) NOT NULL,
+    subclass_name VARCHAR(100) UNIQUE NOT NULL,
     subclass_description TEXT NOT NULL,
     class_id INT NOT NULL,
     UNIQUE(subclass_name, class_id),
@@ -53,10 +52,10 @@ CREATE TABLE tag (
 CREATE TABLE character (
     character_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     character_name VARCHAR(100) NOT NULL,
-    character_description TEXT NOT NULL,
+    character_key TEXT UNIQUE,
+    character_description TEXT,
     character_page_url VARCHAR(255),
     dnd_beyond_id VARCHAR(100),
-    westmarch_id VARCHAR(100) NOT NULL UNIQUE,
     picture_url VARCHAR(255),
     player_id INT NOT NULL,
     race_id INT NOT NULL,
@@ -84,11 +83,9 @@ CREATE TABLE character_class (
 
 CREATE TABLE session (
     session_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    session_name VARCHAR(100) NOT NULL,
-    session_url VARCHAR(255) NOT NULL UNIQUE,
+    session_name VARCHAR(100) UNIQUE NOT NULL,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
-    level_tier INT NOT NULL,
-    dm_player_id INT NOT NULL,
+    dm_player_id INT,
 
     FOREIGN KEY (dm_player_id) REFERENCES player(player_id)
 );
@@ -111,7 +108,6 @@ CREATE TABLE character_growth (
     gold INT NOT NULL DEFAULT 0,
     passive_perception INT NOT NULL,
     armor_class INT NOT NULL,
-    spell_slots JSONB NOT NULL DEFAULT '{}'::JSONB,
     UNIQUE(character_id, session_id),
 
     FOREIGN KEY (character_id) REFERENCES character(character_id),
@@ -144,19 +140,18 @@ CREATE TABLE spell_tag (
 
 CREATE TABLE spellbook (
     spellbook_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    character_id INT NOT NULL,
+    growth_id INT NOT NULL,
     spell_id INT NOT NULL,
 
-    UNIQUE(character_id, spell_id),
+    UNIQUE(growth_id, spell_id),
 
-    FOREIGN KEY (character_id) REFERENCES character(character_id),
+    FOREIGN KEY (growth_id) REFERENCES character_growth(growth_id),
     FOREIGN KEY (spell_id) REFERENCES spell(spell_id)
 );
 
 CREATE TABLE item (
     item_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     item_name VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT NOT NULL,
     type VARCHAR(50) NOT NULL,
     rarity VARCHAR(50) NOT NULL,
     is_magical BOOLEAN NOT NULL DEFAULT FALSE

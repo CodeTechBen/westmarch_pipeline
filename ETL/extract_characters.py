@@ -8,11 +8,10 @@
 '''Extracts data from DND Beyond scraped from westmarches and prepares it for transformation and loading into the database.'''
 
 import re
-import json
 from datetime import datetime, timezone
 
 import logging
-from setup import setup_logging, get_db_connection # type: ignore
+from setup import setup_logging
 from os import environ as ENV
 from dotenv import load_dotenv
 
@@ -77,7 +76,7 @@ def get_characters_page(url: str) -> dict[str, list[dict[str, str]]]: # type: ig
             "westmarch_url": full_url,
         })
 
-    return {"players": list(players.values())} # type: ignore
+        return {"players": list(players.values())} # type: ignore
 
 def get_character_sheet_link(soup: BeautifulSoup) -> str: # type: ignore
      '''Extracts character link from the DND Beyond character page.'''
@@ -351,15 +350,12 @@ def get_latest_past_session(sessions: list[dict[str, any]]) -> dict[str, any]:
 
     return max(valid_sessions, key=lambda s: s["date"])
 
-def Extract():
+def extract() -> dict[str, list[dict[str, any]]]: # type: ignore
     '''Main function to execute the extraction process.'''
     setup_logging()
-    # conn = get_db_connection()
+
     logging.info("Database connection established.")
     players = get_characters_page(url=ENV['WESTMARCH_URL'])
-
-    with open('extract_players.json', 'w') as f:
-        json.dump(players, f, indent=2)
     
     players_out_dict = {}
     characters_out = []
@@ -387,12 +383,12 @@ def Extract():
         for character in player['characters']:
             character_key = character["westmarch_url"].split("/")[-1]
 
-            # --- scrape westmarch ---
+
             character_page = get_character_page(character['westmarch_url'])
             character['character_sheet'] = character_page['character_sheet']
             character['sessions'] = character_page['sessions']
 
-            # --- get dnd beyond ---
+
             dnd_info = get_dnd_beyond_info(character['character_sheet'])
             if dnd_info and not players_out_dict[player_key]["dnd_beyond_name"]:
                 players_out_dict[player_key]["dnd_beyond_name"] = dnd_info.get("player_name")
@@ -400,7 +396,7 @@ def Extract():
             if not dnd_info:
                 continue
 
-            # --- CHARACTER ---
+
             characters_out.append({ 
                 "character_key": character_key,
                 "character_name": character["character_name"],
@@ -409,7 +405,7 @@ def Extract():
                 "race": dnd_info["race"],
                 "player_key": player_key
             })
-            # --- CLASSES ---
+
             for cls in dnd_info["classes"]:
                 if cls["class_name"] not in class_out_dict:
                     class_out_dict[cls["class_name"]] = {
@@ -419,7 +415,8 @@ def Extract():
                 if cls["subclass_name"] and cls["subclass_name"] not in subclass_out_dict:
                     subclass_out_dict[cls["subclass_name"]] = {
                         "subclass_name": cls["subclass_name"],
-                        "description": cls.get("subclass_description", "No description available.")
+                        "description": cls.get("subclass_description", "No description available."),
+                        "class_name": cls["class_name"]
                     }
 
                 character_class_out.append({
@@ -429,13 +426,12 @@ def Extract():
                     "level": cls["level"]
                 })
 
-            # --- SESSIONS ---
+
             latest_session = get_latest_past_session(character["sessions"])
 
             if latest_session:
                 session_key = latest_session["session_url"].split("/")[-1]
 
-                # --- SESSIONS ---
                 if session_key not in sessions_out:
                     sessions_out[session_key] = {
                         "session_key": session_key,
@@ -444,7 +440,6 @@ def Extract():
                         "dm_player_key": latest_session["dm"]["discord_name"]
                     }
 
-                # --- CHARACTER GROWTH ---
                 character_growth_out.append({
                     "character_key": character_key,
                     "session_key": session_key,
@@ -454,7 +449,6 @@ def Extract():
                     "spell_slots": dnd_info["spell_slots"]
                 })
 
-            # --- INVENTORY ---
             for item in dnd_info["equipment"]:
                 if item["item_name"] not in items_out_dict:
                     items_out_dict[item["item_name"]] = item
@@ -466,15 +460,12 @@ def Extract():
                     "tags": item["tags"]
                 })
 
-            # --- SPELLBOOK ---
             for spell in dnd_info["spells"]:
                 spell_name = spell["spell_name"]
 
-                # --- GLOBAL SPELL TABLE ---
                 if spell_name not in spells_out_dict:
                     spells_out_dict[spell_name] = spell
 
-                # --- SPELLBOOK (character ↔ spell) ---
                 spellbook_out.append({
                     "character_key": character_key,
                     "spell_name": spell_name
@@ -495,4 +486,4 @@ def Extract():
     }
 
 if __name__ == "__main__":
-    Extract()
+    extract()
