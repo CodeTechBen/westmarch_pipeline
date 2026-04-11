@@ -726,6 +726,56 @@ def load_spells(conn, spells, tag_map):
     conn.commit()
     logging.info("Spells loaded successfully.")
 
+def load_items(conn, items, tag_map):
+    '''Loads item data into the database.'''
+    with conn.cursor() as cur:
+        for item in items or []:
+            logging.info(f"Loading item: {item.get('item_name')}")
+            cur.execute("""
+                INSERT INTO item (
+                    item_name,
+                    type,
+                    rarity,
+                    is_magical
+                )
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (item_name) DO UPDATE SET
+                    type = EXCLUDED.type,
+                    rarity = EXCLUDED.rarity,
+                    is_magical = EXCLUDED.is_magical
+            """, (
+                item.get("item_name"),
+                item.get("type"),
+                item.get("rarity"),
+                item.get("is_magical", False)
+            ))
+
+            cur.execute("""
+                SELECT item_id FROM item WHERE item_name = %s
+            """, (item.get("item_name"),))
+            item_id = cur.fetchone()[0]
+
+            for tag in item.get("tags", []):
+                item.get("weight"),
+                item.get("cost")
+            
+
+            cur.execute("""
+                SELECT item_id FROM item WHERE item_name = %s
+            """, (item.get("item_name"),))
+            item_id = cur.fetchone()[0]
+
+            for tag in item.get("tags", []):
+                tag_id = tag_map.get(tag)
+                if tag_id:
+                    cur.execute("""
+                        INSERT INTO item_tag (item_id, tag_id)
+                        VALUES (%s, %s)
+                        ON CONFLICT DO NOTHING
+                    """, (item_id, tag_id))
+
+    conn.commit()
+
 def load():
     setup_logging()
 
