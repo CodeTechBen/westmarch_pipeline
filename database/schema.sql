@@ -120,8 +120,8 @@ CREATE TABLE spell (
     description TEXT NOT NULL,
     level INT NOT NULL,
     school VARCHAR(50) NOT NULL,
-    casting_time VARCHAR(50) NOT NULL,
-    range VARCHAR(50) NOT NULL,
+    casting_time VARCHAR(180) NOT NULL,
+    range VARCHAR(50),
     damage VARCHAR(50),
     consumes_material BOOLEAN NOT NULL DEFAULT FALSE,
     material_components TEXT,
@@ -140,7 +140,8 @@ CREATE TABLE spell_tag (
 
 CREATE TABLE spellbook (
     spellbook_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    growth_id INT NOT NULL,
+    growth_id INT,
+    character_id INT NOT NULL,
     spell_id INT NOT NULL,
 
     UNIQUE(growth_id, spell_id),
@@ -152,6 +153,7 @@ CREATE TABLE spellbook (
 CREATE TABLE item (
     item_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     item_name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
     type VARCHAR(50) NOT NULL,
     rarity VARCHAR(50) NOT NULL,
     is_magical BOOLEAN NOT NULL DEFAULT FALSE
@@ -167,11 +169,12 @@ CREATE TABLE item_tag (
 
 CREATE TABLE inventory (
     inventory_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    growth_id INT NOT NULL,
+    growth_id INT,
+    character_id INT NOT NULL,
     item_id INT NOT NULL,
     quantity INT NOT NULL,
 
-    UNIQUE(growth_id, item_id),
+    UNIQUE(growth_id, item_id, character_id),
 
     FOREIGN KEY (growth_id) REFERENCES character_growth(growth_id),
     FOREIGN KEY (item_id) REFERENCES item(item_id)

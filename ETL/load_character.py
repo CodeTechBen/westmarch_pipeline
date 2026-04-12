@@ -662,10 +662,13 @@ def load_spells(conn, spells, tag_map):
             if range.get("origin") == "self":
                 range_value = "Self"
             else:
-                range_value = range.get("rangeValue")
+                range_value = range.get("rangeValue", "")
             
             duration = spell.get("duration")
-            duration_value = " ".join([str(duration.get("durationInterval", "")), duration.get("durationUnit", "")]) if duration else None
+            duration_value = " ".join([
+                str(duration.get("durationInterval") or ""),
+                str(duration.get("durationUnit") or "")
+            ]) if duration else ""
             cur.execute("""
                 INSERT INTO spell (
                     spell_name,
@@ -814,11 +817,11 @@ def load_inventory(conn, inventory, character_map):
             item_id = result[0]
             logging.info(f"Loading inventory for character {character_key}: {item_name} x{quantity}")
             cur.execute("""
-                INSERT INTO inventory (growth_id, item_id, quantity)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (growth_id, item_id) DO UPDATE SET
+                INSERT INTO inventory (growth_id, character_id, item_id, quantity)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (growth_id, item_id, character_id) DO UPDATE SET
                     quantity = EXCLUDED.quantity
-            """, (growth_id, item_id, quantity))
+            """, (growth_id, character_id, item_id, quantity))
     conn.commit()
 
 def load_spellbook(conn, spellbook, character_map):
@@ -845,12 +848,12 @@ def load_spellbook(conn, spellbook, character_map):
                 continue
 
             spell_id = result[0]
-            logging.info(f"Loading spellbook for character {character_key}: {spell_name}")
+            logging.info(f"Loading spellbook for character {character_id}: {spell_name}")
             cur.execute("""
-                INSERT INTO spellbook (growth_id, spell_id)
-                VALUES (%s, %s)
+                INSERT INTO spellbook (growth_id, character_id, spell_id)
+                VALUES (%s, %s, %s)
                 ON CONFLICT DO NOTHING
-            """, (growth_id, spell_id))
+            """, (growth_id, character_id, spell_id))
     conn.commit()
 def load():
     setup_logging()

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="player-detail-page">
+
+    <a href="/" class="back-link">← Back to Home</a>
+
+    <section class="player-header-card">
+        <h1 id="player-title">PLAYER</h1>
+        <div class="section-rule thick"></div>
+
+        <div class="player-meta">
+            <div id="player-discord">Discord: -</div>
+            <div id="player-beyond">D&amp;D Beyond: -</div>
+        </div>
+
+        <div class="player-meta">
+            <div id="player-joined">Joined: -</div>
+            <div id="player-sessions-played">Sessions Played: -</div>
+        </div>
+    </section>
+
+    <section class="characters-section">
+        <h2 class="section-title">CHARACTERS <span id="character-count">(0)</span></h2>
+        <div class="section-rule"></div>
+
+        <div id="player-characters" class="player-character-list"></div>
+    </section>
+
+    <section class="activity-section">
+        <h2 class="section-title">ACTIVITY</h2>
+        <div class="section-rule"></div>
+
+        <div class="chart-card">
+            <canvas id="sessionsPerMonthChart"></canvas>
+        </div>
+    </section>
+
+    <section class="recent-sessions-section">
+        <h2 class="section-title">RECENT SESSIONS</h2>
+        <div class="section-rule"></div>
+
+        <div class="table-wrapper">
+            <table class="recent-sessions-table">
+                <thead>
+                    <tr>
+                        <th>Session</th>
+                        <th>Date</th>
+                        <th>Character</th>
+                        <th>DM</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-sessions-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+<script>
+    const playerId = {{ player_id|tojson }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='player_detail.js') }}"></script>
+{% endblock %}

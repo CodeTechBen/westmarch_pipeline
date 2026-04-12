@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+    <h2>Sessions</h2>
+
+    <select id="dm-filter">
+        <option value="">Filter by DM</option>
+    </select>
+</div>
+
+<div id="sessions-container"></div>
+
+<script src="/static/sessions.js"></script>
+
+{% endblock %}

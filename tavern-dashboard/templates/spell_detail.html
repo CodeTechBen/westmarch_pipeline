@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="spell-detail-page">
+
+    <a href="/" class="back-link">← Back to Home</a>
+
+    <section class="spell-header-card">
+        <h1 id="spell-title">SPELL NAME</h1>
+        <div class="section-rule thick"></div>
+        <div id="spell-subtitle" class="spell-subtitle">Level School</div>
+    </section>
+
+    <section class="spell-meta-box">
+        <div class="spell-meta-grid">
+            <div><strong>Casting Time:</strong> <span id="spell-casting-time">-</span></div>
+            <div><strong>Range:</strong> <span id="spell-range">-</span></div>
+            <div><strong>Duration:</strong> <span id="spell-duration">-</span></div>
+            <div><strong>Components:</strong> <span id="spell-components">-</span></div>
+            <div><strong>Concentration:</strong> <span id="spell-concentration">-</span></div>
+            <div><strong>Ritual:</strong> <span id="spell-ritual">-</span></div>
+        </div>
+    </section>
+
+    <section class="spell-description-section">
+        <h2 class="section-title">DESCRIPTION</h2>
+        <div class="section-rule"></div>
+        <p id="spell-description" class="spell-description-text"></p>
+    </section>
+
+    <section class="spell-tags-section">
+        <h2 class="section-title">TAGS</h2>
+        <div class="section-rule"></div>
+        <div id="spell-tags" class="tag-list"></div>
+    </section>
+
+    <section class="spell-known-by-section">
+        <h2 class="section-title">
+            CHARACTERS WHO KNOW THIS SPELL <span id="known-count">(0)</span>
+        </h2>
+        <div class="section-rule thick"></div>
+
+        <div class="table-wrapper">
+            <table class="spell-known-table">
+                <thead>
+                    <tr>
+                        <th>Character</th>
+                        <th>Player</th>
+                        <th>Class</th>
+                        <th>Level</th>
+                        <th>Active</th>
+                    </tr>
+                </thead>
+                <tbody id="spell-known-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+<script>
+    const spellId = {{ spell_id|tojson }};
+</script>
+<script src="{{ url_for('static', filename='spell_detail.js') }}"></script>
+{% endblock %}

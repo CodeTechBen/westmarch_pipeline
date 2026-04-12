@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="session-detail-page">
+
+    <a href="{{ url_for('sessions_page') }}" class="back-link">← Back to Sessions</a>
+
+    <section class="session-header-card">
+        <h1 id="session-title">Session</h1>
+        <div class="section-rule thick"></div>
+
+        <div class="session-meta">
+            <span id="session-date">📅 Date</span>
+            <span>|</span>
+            <span id="session-dm">🎲 DM</span>
+            <span>|</span>
+            <span id="session-tier">⚔️ Tier</span>
+        </div>
+    </section>
+
+    <!-- CHARACTER ROSTER -->
+    <section class="roster-section">
+        <h2 class="section-title">CHARACTER ROSTER</h2>
+        <div class="section-rule"></div>
+
+        <div id="character-container" class="character-roster"></div>
+    </section>
+
+    <!-- ITEM DISTRIBUTION -->
+    <section class="items-section">
+        <h2 class="section-title">
+            ITEM DISTRIBUTION 
+            <span class="section-subtitle">(for reward planning)</span>
+        </h2>
+
+        <div class="section-rule thick"></div>
+
+        <div class="filter-row">
+            <label for="item-tag-filter">Filter:</label>
+            <select id="item-tag-filter" class="filter-select">
+                <option value="">Item Tag</option>
+                <option value="Healing">Healing</option>
+                <option value="Weapon">Weapon</option>
+                <option value="Utility">Utility</option>
+                <option value="Fire">Fire</option>
+                <option value="Wondrous">Wondrous</option>
+            </select>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="item-table">
+                <thead>
+                    <tr>
+                        <th>Character</th>
+                        <th>Gold</th>
+                        <th>Common</th>
+                        <th>Uncommon</th>
+                        <th>Rare</th>
+                        <th>Very Rare</th>
+                        <th>Leg.</th>
+                    </tr>
+                </thead>
+                <tbody id="item-body"></tbody>
+            </table>
+        </div>
+
+        <p id="recommendation" class="recommendation-text"></p>
+    </section>
+
+</div>
+
+<script>
+    const sessionId = {{ session_id }};
+</script>
+<script src="{{ url_for('static', filename='session_detail.js') }}"></script>
+
+{% endblock %}

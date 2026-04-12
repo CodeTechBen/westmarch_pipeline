@@ -76,7 +76,7 @@ def get_characters_page(url: str) -> dict[str, list[dict[str, str]]]: # type: ig
             "westmarch_url": full_url,
         })
 
-        return {"players": list(players.values())} # type: ignore
+    return {"players": list(players.values())} # type: ignore
 
 def get_character_sheet_link(soup: BeautifulSoup) -> str: # type: ignore
      '''Extracts character link from the DND Beyond character page.'''
