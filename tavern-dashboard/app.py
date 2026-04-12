@@ -172,6 +172,219 @@ def search():
 
     return jsonify(results)
 
+@app.route("/search")
+def search_page():
+    return render_template("search_results.html")
+
+
+@app.route("/api/search/full")
+def full_search():
+    q = request.args.get("q", "").strip()
+    filter_type = request.args.get("type", "all").strip().lower()
+
+    if not q:
+        return jsonify({
+            "query": "",
+            "items": [],
+            "spells": [],
+            "characters": [],
+            "available_tags": []
+        })
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    query = f"%{q}%"
+
+    items = []
+    spells = []
+    characters = []
+    available_tags = set()
+
+    # ----------------------------
+    # Items
+    # ----------------------------
+    if filter_type in ("all", "items"):
+        cur.execute("""
+            SELECT
+                i.item_id,
+                i.item_name,
+                i.rarity,
+                COUNT(DISTINCT inv.character_id) AS owned_by_count
+            FROM item i
+            LEFT JOIN inventory inv
+                ON i.item_id = inv.item_id
+            LEFT JOIN item_tag it
+                ON i.item_id = it.item_id
+            LEFT JOIN tag t
+                ON it.tag_id = t.tag_id
+            WHERE i.item_name ILIKE %s
+               OR i.type ILIKE %s
+               OR t.tag_name ILIKE %s
+            GROUP BY i.item_id, i.item_name, i.rarity
+            ORDER BY i.item_name
+            LIMIT 50
+        """, (query, query, query))
+
+        for row in cur.fetchall():
+            items.append({
+                "item_id": row[0],
+                "item_name": row[1],
+                "rarity": row[2],
+                "owned_by_count": row[3]
+            })
+
+        cur.execute("""
+            SELECT DISTINCT t.tag_name
+            FROM item i
+            JOIN item_tag it
+                ON i.item_id = it.item_id
+            JOIN tag t
+                ON it.tag_id = t.tag_id
+            WHERE i.item_name ILIKE %s
+               OR i.type ILIKE %s
+               OR t.tag_name ILIKE %s
+            ORDER BY t.tag_name
+            LIMIT 20
+        """, (query, query, query))
+        available_tags.update(row[0] for row in cur.fetchall())
+
+    # ----------------------------
+    # Spells
+    # ----------------------------
+    if filter_type in ("all", "spells"):
+        cur.execute("""
+            SELECT
+                s.spell_id,
+                s.spell_name,
+                s.level,
+                COUNT(DISTINCT sb.character_id) AS known_by_count
+            FROM spell s
+            LEFT JOIN spellbook sb
+                ON s.spell_id = sb.spell_id
+            LEFT JOIN spell_tag st
+                ON s.spell_id = st.spell_id
+            LEFT JOIN tag t
+                ON st.tag_id = t.tag_id
+            WHERE s.spell_name ILIKE %s
+               OR s.school ILIKE %s
+               OR t.tag_name ILIKE %s
+            GROUP BY s.spell_id, s.spell_name, s.level
+            ORDER BY s.level, s.spell_name
+            LIMIT 50
+        """, (query, query, query))
+
+        for row in cur.fetchall():
+            spells.append({
+                "spell_id": row[0],
+                "spell_name": row[1],
+                "level": row[2],
+                "known_by_count": row[3]
+            })
+
+        cur.execute("""
+            SELECT DISTINCT t.tag_name
+            FROM spell s
+            JOIN spell_tag st
+                ON s.spell_id = st.spell_id
+            JOIN tag t
+                ON st.tag_id = t.tag_id
+            WHERE s.spell_name ILIKE %s
+               OR s.school ILIKE %s
+               OR t.tag_name ILIKE %s
+            ORDER BY t.tag_name
+            LIMIT 20
+        """, (query, query, query))
+        available_tags.update(row[0] for row in cur.fetchall())
+
+    # ----------------------------
+    # Characters
+    # ----------------------------
+    if filter_type in ("all", "characters"):
+        cur.execute("""
+            WITH healing_spells AS (
+                SELECT DISTINCT sb.character_id, sb.spell_id
+                FROM spellbook sb
+                JOIN spell_tag st
+                    ON sb.spell_id = st.spell_id
+                JOIN tag t
+                    ON st.tag_id = t.tag_id
+                WHERE t.tag_name ILIKE %s
+            ),
+            healing_items AS (
+                SELECT DISTINCT inv.character_id, inv.item_id
+                FROM inventory inv
+                JOIN item_tag it
+                    ON inv.item_id = it.item_id
+                JOIN tag t
+                    ON it.tag_id = t.tag_id
+                WHERE t.tag_name ILIKE %s
+            ),
+            latest_growth AS (
+                SELECT DISTINCT ON (cg.character_id)
+                    cg.character_id,
+                    cg.level
+                FROM character_growth cg
+                ORDER BY cg.character_id, cg.time DESC
+            )
+            SELECT
+                c.character_id,
+                c.character_name,
+                p.player_name,
+                COALESCE(cl.class_name, 'Unknown') AS class_name,
+                COALESCE(lg.level, c.starting_level) AS level,
+                COUNT(DISTINCT hs.spell_id) AS healing_spell_count,
+                COUNT(DISTINCT hi.item_id) AS healing_item_count
+            FROM character c
+            JOIN player p
+                ON c.player_id = p.player_id
+            LEFT JOIN latest_growth lg
+                ON c.character_id = lg.character_id
+            LEFT JOIN character_class cc
+                ON c.character_id = cc.character_id
+            LEFT JOIN class cl
+                ON cc.class_id = cl.class_id
+            LEFT JOIN healing_spells hs
+                ON c.character_id = hs.character_id
+            LEFT JOIN healing_items hi
+                ON c.character_id = hi.character_id
+            WHERE c.character_name ILIKE %s
+               OR p.player_name ILIKE %s
+               OR cl.class_name ILIKE %s
+               OR hs.spell_id IS NOT NULL
+               OR hi.item_id IS NOT NULL
+            GROUP BY
+                c.character_id,
+                c.character_name,
+                p.player_name,
+                cl.class_name,
+                lg.level,
+                c.starting_level
+            ORDER BY c.character_name
+            LIMIT 50
+        """, (query, query, query, query, query))
+
+        for row in cur.fetchall():
+            characters.append({
+                "character_id": row[0],
+                "character_name": row[1],
+                "player_name": row[2],
+                "class_display": f"{row[3]} {row[4]}",
+                "healing_spell_count": row[5],
+                "healing_item_count": row[6]
+            })
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "query": q,
+        "items": items,
+        "spells": spells,
+        "characters": characters,
+        "available_tags": sorted(available_tags)
+    })
+
 @app.route("/api/sessions/list")
 def session_list():
     conn = get_connection()

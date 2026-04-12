@@ -27,22 +27,24 @@ fetch('/api/sessions')
 });
 
 // Search
-document.getElementById('search').addEventListener('input', function() {
+const searchInput = document.getElementById('search');
+const searchResults = document.getElementById('search-results');
+
+searchInput.addEventListener('input', function() {
     let q = this.value.trim();
-    let container = document.getElementById('search-results');
 
     if (q.length < 2) {
-        container.innerHTML = "";
+        searchResults.innerHTML = "";
         return;
     }
 
     fetch(`/api/search?q=${encodeURIComponent(q)}`)
     .then(res => res.json())
     .then(data => {
-        container.innerHTML = "";
+        searchResults.innerHTML = "";
 
         if (!data.length) {
-            container.innerHTML = `<div class="result">No results found</div>`;
+            searchResults.innerHTML = `<div class="result">No results found</div>`;
             return;
         }
 
@@ -51,10 +53,18 @@ document.getElementById('search').addEventListener('input', function() {
             a.className = "result result-link";
             a.href = r.url;
             a.innerText = `${r.name} [${r.type}]`;
-
-            container.appendChild(a);
+            searchResults.appendChild(a);
         });
     });
+});
+
+searchInput.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+        const q = this.value.trim();
+        if (q.length > 0) {
+            window.location.href = `/search?q=${encodeURIComponent(q)}`;
+        }
+    }
 });
 
 document.addEventListener("click", function(event) {

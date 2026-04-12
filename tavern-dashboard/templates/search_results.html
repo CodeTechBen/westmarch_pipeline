@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="search-results-page">
+
+    <section class="search-page-header">
+        <div class="search-header-row">
+            <input type="text" id="search-page-input" class="search-page-input" placeholder="Search...">
+            <button id="search-page-button" class="search-page-button">🔍 Search</button>
+        </div>
+
+        <h1 id="search-page-title">Search</h1>
+        <div class="section-rule thick"></div>
+
+        <div class="search-filter-row">
+            <span class="filter-label">FILTER BY:</span>
+            <button class="search-filter-btn active" data-filter="all">All</button>
+            <button class="search-filter-btn" data-filter="items">Items Only</button>
+            <button class="search-filter-btn" data-filter="spells">Spells Only</button>
+            <button class="search-filter-btn" data-filter="characters">Characters</button>
+        </div>
+
+        <div class="search-tags-row">
+            <span class="filter-label">TAGS:</span>
+            <div id="search-tags" class="tag-list"></div>
+        </div>
+    </section>
+
+    <section id="items-section" class="search-group-section">
+        <h2 class="section-title">ITEMS <span id="items-count">(0 results)</span></h2>
+        <div class="section-rule"></div>
+        <div id="items-results" class="search-card-list"></div>
+    </section>
+
+    <section id="spells-section" class="search-group-section">
+        <h2 class="section-title">SPELLS <span id="spells-count">(0 results)</span></h2>
+        <div class="section-rule"></div>
+        <div id="spells-results" class="search-card-list"></div>
+    </section>
+
+    <section id="characters-section" class="search-group-section">
+        <h2 class="section-title">CHARACTERS WITH MATCHING CAPABILITIES <span id="characters-count">(0 results)</span></h2>
+        <div class="section-rule"></div>
+
+        <div class="table-wrapper">
+            <table class="search-characters-table">
+                <thead>
+                    <tr>
+                        <th>Character</th>
+                        <th>Player</th>
+                        <th>Class</th>
+                        <th>Matching Spells</th>
+                        <th>Matching Items</th>
+                    </tr>
+                </thead>
+                <tbody id="characters-results-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+<script src="{{ url_for('static', filename='search_results.js') }}"></script>
+{% endblock %}
