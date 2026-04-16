@@ -34,28 +34,22 @@ def get_players(conn: psycopg2.extensions.connection) -> tuple[dict[str, int], d
     return discord_map, player_name_map, dnd_map
 
 def load_players(conn: psycopg2.extensions.connection, players):
-    '''Loads player data into the database.'''
+    """Loads player data into the database."""
     with conn.cursor() as cur:
-        discord_map, player_name_map, dnd_map = get_players(conn)
         for player in players:
             logging.info(f"Loading player: {player['player_name']}")
-            if player['player_name'] not in player_name_map and player['discord_name'] not in discord_map and player['dnd_beyond_name'] not in dnd_map:
-                cur.execute("""
-                    INSERT INTO player (player_name, discord_name, dnd_beyond_name)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (player_id) DO UPDATE SET
-                        player_name = EXCLUDED.player_name,
-                        discord_name = EXCLUDED.discord_name,
-                        dnd_beyond_name = EXCLUDED.dnd_beyond_name
-                    RETURNING player_id, discord_name
-                """, (
-                    player['player_name'],
-                    player['discord_name'],
-                    player['dnd_beyond_name']
-                ))
-                player_id, discord_name = cur.fetchone() # type: ignore
-                logging.info("Player data loaded successfully.")
-            conn.commit()
+            cur.execute("""
+                INSERT INTO player (player_name, discord_name, dnd_beyond_name)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (discord_name) DO UPDATE SET
+                    player_name = EXCLUDED.player_name,
+                    dnd_beyond_name = EXCLUDED.dnd_beyond_name
+            """, (
+                player["player_name"],
+                player["discord_name"],
+                player["dnd_beyond_name"]
+            ))
+    conn.commit()
 
 def get_races(conn: psycopg2.extensions.connection) -> dict[str, int]:
     '''Returns a lookup map for races by name.'''
@@ -179,7 +173,7 @@ def find_existing_player(player: dict[str, str], discord_map: dict[str, int], pl
     '''Finds an existing player ID using priority matching.'''
 
     discord_name = player.get("discord_name")
-    player_name = player.get("name")
+    player_name = player.get("player_name") or player.get("name")
     dnd_name = player.get("dnd_beyond_name")
 
     if discord_name and discord_name in discord_map:
@@ -265,26 +259,21 @@ def load_character(
     player_name_map: dict[str, int],
     dnd_map: dict[str, int]
 ):
-    '''Loads character and character_class data into the database.'''
+    """Loads character data into the database, including characters without D&D Beyond data."""
 
     race_map = get_races(conn)
-    class_map = get_classes(conn)
-    subclass_map = get_subclasses(conn)
-
-    character_lookup = get_characters(conn)  # key -> id
+    character_lookup = get_characters(conn)
 
     with conn.cursor() as cur:
-
         for character in characters:
             character_key = character.get("character_key")
             if not character_key:
                 continue
 
             player_key = character.get("player_key")
-
             player_obj = {
                 "discord_name": player_key,
-                "name": None,
+                "player_name": None,
                 "dnd_beyond_name": None
             }
 
@@ -296,77 +285,46 @@ def load_character(
             )
 
             if not player_id:
-                logging.warning(f"No player found for character {player_key}")
+                logging.warning(f"No player found for character {character_key}")
                 continue
 
-            race_name = character.get("race", {}).get("name")
-            race_id = race_map.get(race_name)
+            race = character.get("race")
+            race_name = race.get("name") if isinstance(race, dict) else None
+            race_id = race_map.get(race_name) if race_name else None
 
-            if not race_id:
-                logging.warning(f"Race not found: {race_name}")
-                continue
+            if race_name and not race_id:
+                logging.warning(f"Race not found in DB: {race_name}")
 
-            if character_key not in character_lookup:
-                cur.execute("""
-                    INSERT INTO character (
-                        character_key,
-                        character_name,
-                        character_page_url,
-                        dnd_beyond_id,
-                        player_id,
-                        race_id
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (character_key) DO UPDATE SET
-                        character_name = EXCLUDED.character_name,
-                        player_id = EXCLUDED.player_id,
-                        race_id = EXCLUDED.race_id
-                    RETURNING character_id
-                """, (
-                    character.get("character_key"),
-                    character.get("character_name"),
-                    character.get("character_page_url"),
-                    character.get("dnd_beyond_id"),
+            cur.execute("""
+                INSERT INTO character (
+                    character_key,
+                    character_name,
+                    character_page_url,
+                    dnd_beyond_id,
                     player_id,
                     race_id
-                ))
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (character_key) DO UPDATE SET
+                    character_name = EXCLUDED.character_name,
+                    character_page_url = EXCLUDED.character_page_url,
+                    dnd_beyond_id = EXCLUDED.dnd_beyond_id,
+                    player_id = EXCLUDED.player_id,
+                    race_id = EXCLUDED.race_id
+                RETURNING character_id
+            """, (
+                character.get("character_key"),
+                character.get("character_name"),
+                character.get("character_page_url"),
+                character.get("dnd_beyond_id"),
+                player_id,
+                race_id
+            ))
 
-                character_id = cur.fetchone()[0]
-                character_lookup[character.get("character_key")] = character_id
+            character_id = cur.fetchone()[0]
+            character_lookup[character_key] = character_id
 
-                logging.info(f"Inserted character: {character.get('character_name')}")
-            else:
-                character_id = character_lookup[character.get("character_key")]
-
-            for cls in character.get("classes", []):
-                class_name = cls.get("class_name")
-                subclass_name = cls.get("subclass_name")
-                level = cls.get("level", 1)
-
-                class_id = class_map.get(class_name)
-                subclass_id = subclass_map.get(subclass_name) if subclass_name else None
-
-                if not class_id:
-                    logging.warning(f"Class not found: {class_name}")
-                    continue
-
-                cur.execute("""
-                    INSERT INTO character_class (
-                        character_id,
-                        class_id,
-                        subclass_id,
-                        level
-                    )
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (character_id, class_id) DO UPDATE SET
-                        subclass_id = EXCLUDED.subclass_id,
-                        level = EXCLUDED.level
-                """, (
-                    character_id,
-                    class_id,
-                    subclass_id,
-                    level
-                ))
+            logging.info(f"Loaded character: {character.get('character_name')}")
 
     conn.commit()
     logging.info("Character data loaded successfully.")
