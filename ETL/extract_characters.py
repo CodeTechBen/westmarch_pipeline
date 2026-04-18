@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from os import environ as ENV
 from typing import Any, Optional
@@ -28,11 +29,12 @@ from dndbeyond_utils import get_dnd_beyond_info
 
 load_dotenv()
 
+BASE_URL = "https://www.westmarches.games"
+
 
 def setup_selenium() -> webdriver.Chrome:
     """Configure Selenium WebDriver for scraping."""
     options = webdriver.ChromeOptions()
-    # Uncomment for non-debug / server use:
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
@@ -40,20 +42,34 @@ def setup_selenium() -> webdriver.Chrome:
     return webdriver.Chrome(options=options)
 
 
+def clean_text(value: Optional[str]) -> Optional[str]:
+    """Normalize text."""
+    if not value:
+        return None
+    cleaned = " ".join(value.split()).strip()
+    return cleaned or None
+
+
+def get_page_soup(
+    driver: webdriver.Chrome,
+    url: str,
+    wait_seconds: int = 15,
+) -> BeautifulSoup:
+    """Load a page and return BeautifulSoup."""
+    driver.get(url)
+    WebDriverWait(driver, wait_seconds).until(
+        EC.presence_of_element_located((By.TAG_NAME, "body"))
+    )
+    return BeautifulSoup(driver.page_source, "html.parser")
+
+
 def get_characters_page(url: str) -> dict[str, list[dict[str, str]]]:
     """Scrape the Westmarches characters index page."""
-    base_url = "https://www.westmarches.games"
     logging.info(f"Extracting characters from URL: {url}")
 
     driver = setup_selenium()
-    url_test = "https://www.westmarches.games/communities/tower-frontiers/characters/cmjm4ibsq00bx05if3gjwy1e8"
-    url_test2= "https://www.westmarches.games/communities/tower-frontiers/characters/cmjm4w8cx00iq05if9ikxsgyd"
     try:
-        driver.get(url_test)
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.TAG_NAME, "body"))
-        )
-        soup = BeautifulSoup(driver.page_source, "html.parser")
+        soup = get_page_soup(driver, url)
     finally:
         driver.quit()
 
@@ -64,14 +80,32 @@ def get_characters_page(url: str) -> dict[str, list[dict[str, str]]]:
         if "/characters/" not in href:
             continue
 
-        full_url = base_url + href
+        full_url = BASE_URL + href
 
-        img = a.find("img", alt=True)
-        if not img:
-            logging.info("No img!!")
+        character_name = ""
+
+        avatar_img = a.select_one(".avatar-image img")
+        if avatar_img:
+            character_name = avatar_img.get("alt", "").strip()
+
+        if not character_name:
+            avatar_div = a.select_one(".avatar-image[title]")
+            if avatar_div:
+                character_name = avatar_div.get("title", "").strip()
+
+        if not character_name:
+            for img in a.select("img[alt]"):
+                alt_text = img.get("alt", "").strip()
+                if alt_text:
+                    character_name = alt_text
+                    logging.debug(
+                        f"Fallback alt_text used for character name: '{character_name}'"
+                    )
+                    break
+
+        if not character_name:
+            logging.warning(f"Skipping character card with no character name: {full_url}")
             continue
-        character_name = img["alt"].strip()
-        logging.info(f"Character_name = {character_name}")
 
         player_span = a.select_one("span[aria-label]")
         discord_name = player_span.get("aria-label", "").strip() if player_span else ""
@@ -80,7 +114,9 @@ def get_characters_page(url: str) -> dict[str, list[dict[str, str]]]:
             continue
 
         player_span_text = a.select_one("span.MuiTypography-caption")
-        player_name = player_span_text.text.strip() if player_span_text else discord_name
+        player_name = (
+            player_span_text.get_text(strip=True) if player_span_text else discord_name
+        )
 
         if discord_name not in players:
             players[discord_name] = {
@@ -99,51 +135,21 @@ def get_characters_page(url: str) -> dict[str, list[dict[str, str]]]:
 
 def get_character_sheet_link(soup: BeautifulSoup) -> Optional[str]:
     """Find a D&D Beyond character link on a Westmarches character page."""
-    a = soup.find("a", href=lambda h: h and "/characters/" in h)
+    a = soup.find("a", href=lambda h: h and "dndbeyond.com/characters/" in h)
     if a:
         href = a["href"]
         logging.info(f"Found D&D Beyond character sheet link: {href}")
         return href
 
+    a = soup.find("a", href=lambda h: h and "/characters/" in h)
+    if a:
+        href = a["href"]
+        if "dndbeyond.com" in href:
+            logging.info(f"Found D&D Beyond character sheet link: {href}")
+            return href
+
     logging.info("No D&D Beyond character sheet link found on page.")
     return None
-
-
-def get_character_sessions(soup: BeautifulSoup) -> list[dict[str, Any]]:
-    """Extract all sessions/adventures for a character."""
-    sessions = []
-    base_url = "https://www.westmarches.games"
-
-    for a in soup.select("a.mui-14u38ga"):
-        href = a.get("href")
-        if not href or "/adventures/" not in href:
-            continue
-
-        session_url = base_url + href
-
-        title = a.select_one("h6")
-        session_name = title.text.strip() if title else None
-
-        time_tag = a.select_one("time")
-        session_date = time_tag.get("datetime") if time_tag else None
-
-        dm_span = a.select_one("span[aria-label]")
-        dm_discord = dm_span.get("aria-label") if dm_span else None
-
-        dm_name_tag = a.select_one(".mui-vxcmzt .MuiTypography-body2")
-        dm_name = dm_name_tag.text.strip() if dm_name_tag else None
-
-        sessions.append({
-            "session_name": session_name,
-            "date": session_date,
-            "dm": {
-                "discord_name": dm_discord,
-                "player_name": dm_name,
-            },
-            "session_url": session_url,
-        })
-
-    return sessions
 
 
 def get_character_page(url: str) -> dict[str, Any]:
@@ -152,45 +158,266 @@ def get_character_page(url: str) -> dict[str, Any]:
     driver = setup_selenium()
 
     try:
-        driver.get(url)
-
-        try:
-            WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-        except TimeoutException:
-            logging.warning(f"Timed out waiting for page body on {url}")
-
-        soup = BeautifulSoup(driver.page_source, "html.parser")
+        soup = get_page_soup(driver, url)
         link = get_character_sheet_link(soup)
-        sessions = get_character_sessions(soup)
 
         return {
             "character_sheet": link,
-            "sessions": sessions,
         }
 
+    except TimeoutException:
+        logging.warning(f"Timed out waiting for page body on {url}")
+        return {"character_sheet": None}
     except WebDriverException as e:
         logging.error(f"Selenium error while scraping {url}: {e}")
-        return {
-            "character_sheet": None,
-            "sessions": [],
-        }
+        return {"character_sheet": None}
     except Exception as e:
         logging.error(f"Unexpected error while scraping {url}: {e}")
-        return {
-            "character_sheet": None,
-            "sessions": [],
-        }
+        return {"character_sheet": None}
     finally:
         driver.quit()
 
 
-def get_latest_past_session(sessions: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
-    """Get the latest session whose datetime is in the past."""
-    now = datetime.now(timezone.utc)
+def extract_title_from_meta(soup: BeautifulSoup) -> Optional[str]:
+    """Get the real adventure title from metadata."""
+    og_title = soup.find("meta", attrs={"property": "og:title"})
+    if og_title and og_title.get("content"):
+        title = clean_text(og_title["content"])
+        if title:
+            title = re.sub(
+                r"\s*-\s*Tower Frontiers\s*-\s*WestMarches\.games\s*$",
+                "",
+                title,
+            )
+            return title
 
-    valid_sessions = []
+    twitter_title = soup.find("meta", attrs={"name": "twitter:title"})
+    if twitter_title and twitter_title.get("content"):
+        title = clean_text(twitter_title["content"])
+        if title:
+            title = re.sub(r"\s*-\s*Tower Frontiers\s*$", "", title)
+            return title
+
+    return None
+
+
+def extract_gm_from_visible_html(soup: BeautifulSoup) -> tuple[Optional[str], Optional[str]]:
+    """Extract DM from visible GM block."""
+    gm_link = None
+
+    for a in soup.select('a[href*="/gm/"]'):
+        text = clean_text(a.get_text(" ", strip=True))
+        if text and "Game Master" in text:
+            gm_link = a
+            break
+
+    if not gm_link:
+        return None, None
+
+    player_name = None
+    name_tag = gm_link.select_one("p")
+    if name_tag:
+        player_name = clean_text(name_tag.get_text(" ", strip=True))
+
+    if not player_name:
+        img = gm_link.select_one("img[alt]")
+        if img:
+            player_name = clean_text(img.get("alt"))
+
+    discord_name = player_name
+    return discord_name, player_name
+
+
+def extract_gm_from_scripts(soup: BeautifulSoup) -> tuple[Optional[str], Optional[str]]:
+    """Fallback DM extraction from embedded data."""
+    html = str(soup)
+
+    gm_match = re.search(
+        r'"gm":\{.*?"nicknames":\{.*?"nickname":"([^"]+)".*?"displayName":"([^"]+)"',
+        html,
+        re.DOTALL,
+    )
+    if gm_match:
+        nickname = clean_text(gm_match.group(1))
+        display_name = clean_text(gm_match.group(2))
+        return nickname, nickname or display_name
+
+    gm_match = re.search(
+        r'"gmInfo":\{.*?"user":\{.*?"nicknames":\{.*?"nickname":"([^"]+)".*?"displayName":"([^"]+)"',
+        html,
+        re.DOTALL,
+    )
+    if gm_match:
+        nickname = clean_text(gm_match.group(1))
+        display_name = clean_text(gm_match.group(2))
+        return nickname, nickname or display_name
+
+    return None, None
+
+
+def extract_players_from_visible_html(soup: BeautifulSoup) -> list[dict[str, str]]:
+    """Extract players from visible participant cards."""
+    players: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    for block in soup.select("div.MuiPaper-root"):
+        text = " ".join(block.stripped_strings)
+
+        if "APPROVED" not in text:
+            continue
+
+        char_link = block.select_one('a[href*="/characters/"]')
+        if not char_link:
+            continue
+
+        title_link = block.select_one(
+            'a.MuiTypography-root.MuiTypography-h6[href*="/characters/"]'
+        )
+        if not title_link:
+            continue
+
+        character_name = clean_text(title_link.get_text(" ", strip=True))
+        character_href = char_link.get("href", "").strip()
+        character_url = (
+            BASE_URL + character_href if character_href.startswith("/") else character_href
+        )
+
+        owner = block.select_one('[aria-label^="@"]')
+        player_name = None
+
+        if owner:
+            visible_owner = owner.select_one(".MuiTypography-body2")
+            if visible_owner:
+                player_name = clean_text(visible_owner.get_text(" ", strip=True))
+
+            if not player_name:
+                owner_text = clean_text(owner.get_text(" ", strip=True))
+                if owner_text:
+                    player_name = owner_text
+
+            if not player_name:
+                aria = clean_text(owner.get("aria-label"))
+                if aria:
+                    player_name = aria.removeprefix("@")
+
+        if not character_name or not player_name or not character_url:
+            continue
+
+        key = (player_name, character_name, character_url)
+        if key in seen:
+            continue
+
+        seen.add(key)
+        players.append({
+            "player_name": player_name,
+            "character_name": character_name,
+            "character_url": character_url,
+        })
+
+    return players
+
+
+def get_adventure_links(soup: BeautifulSoup) -> list[str]:
+    """Extract unique adventure URLs from the community adventures page."""
+    links: list[str] = []
+    seen: set[str] = set()
+
+    for a in soup.select('a[href*="/adventures/"]'):
+        href = a.get("href", "").strip()
+        if not href:
+            continue
+        if "/communities/" not in href or "/adventures/" not in href:
+            continue
+
+        full_url = BASE_URL + href if href.startswith("/") else href
+        if full_url in seen:
+            continue
+
+        seen.add(full_url)
+        links.append(full_url)
+
+    return links
+
+
+def get_adventure_detail(driver: webdriver.Chrome, url: str) -> Optional[dict[str, Any]]:
+    """Extract one adventure detail page."""
+    logging.info(f"Extracting adventure page: {url}")
+
+    try:
+        soup = get_page_soup(driver, url)
+    except Exception as e:
+        logging.error(f"Failed to load adventure page {url}: {e}")
+        return None
+
+    session_name = extract_title_from_meta(soup)
+    if not session_name:
+        title_tag = soup.select_one("h1")
+        if title_tag:
+            session_name = clean_text(title_tag.get_text(" ", strip=True))
+
+    time_tag = soup.select_one("time[datetime]")
+    session_date = time_tag.get("datetime") if time_tag else None
+
+    dm_discord, dm_name = extract_gm_from_visible_html(soup)
+    if not dm_discord and not dm_name:
+        dm_discord, dm_name = extract_gm_from_scripts(soup)
+
+    participants = extract_players_from_visible_html(soup)
+
+    session_key = url.rstrip("/").split("/")[-1]
+
+    return {
+        "session_key": session_key,
+        "session_name": session_name,
+        "date": session_date,
+        "dm": {
+            "discord_name": dm_discord,
+            "player_name": dm_name,
+        },
+        "players": participants,
+        "session_url": url,
+    }
+
+
+def get_all_adventures(adventures_url: str) -> list[dict[str, Any]]:
+    """Scrape the community adventures page and all linked adventure detail pages."""
+    logging.info(f"Extracting adventures from listing page: {adventures_url}")
+    driver = setup_selenium()
+
+    try:
+        listing_soup = get_page_soup(driver, adventures_url)
+        adventure_links = get_adventure_links(listing_soup)
+        logging.info(f"Found {len(adventure_links)} adventure links")
+
+        adventures: list[dict[str, Any]] = []
+        for url in adventure_links:
+            adventure = get_adventure_detail(driver, url)
+            if adventure:
+                adventures.append(adventure)
+
+        return adventures
+
+    except TimeoutException:
+        logging.warning(f"Timed out waiting for adventures page body on {adventures_url}")
+        return []
+    except WebDriverException as e:
+        logging.error(f"Selenium error while scraping adventures page {adventures_url}: {e}")
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected error while scraping adventures page {adventures_url}: {e}")
+        return []
+    finally:
+        driver.quit()
+
+
+def split_sessions_by_time(
+    sessions: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split sessions into past and upcoming."""
+    now = datetime.now(timezone.utc)
+    past_sessions: list[dict[str, Any]] = []
+    upcoming_sessions: list[dict[str, Any]] = []
+
     for session in sessions:
         session_date = session.get("date")
         if not session_date:
@@ -203,12 +430,67 @@ def get_latest_past_session(sessions: list[dict[str, Any]]) -> Optional[dict[str
             continue
 
         if parsed <= now:
-            valid_sessions.append(session)
+            past_sessions.append(session)
+        else:
+            upcoming_sessions.append(session)
 
-    if not valid_sessions:
+    return past_sessions, upcoming_sessions
+
+
+def get_latest_past_session(sessions: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    """Get the latest session whose datetime is in the past."""
+    past_sessions, _ = split_sessions_by_time(sessions)
+    if not past_sessions:
         return None
+    return max(past_sessions, key=lambda s: s["date"])
 
-    return max(valid_sessions, key=lambda s: s["date"])
+
+def build_character_session_map(
+    players: dict[str, list[dict[str, Any]]],
+    adventures: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    """Map adventures back to characters using exact character URLs."""
+    known_character_urls: dict[str, str] = {}
+
+    for player in players["players"]:
+        for character in player["characters"]:
+            character_key = character["westmarch_url"].split("/")[-1]
+            known_character_urls[character["westmarch_url"]] = character_key
+
+    character_sessions: dict[str, list[dict[str, Any]]] = {}
+
+    for adventure in adventures:
+        session_stub = {
+            "session_key": adventure["session_key"],
+            "session_name": adventure["session_name"],
+            "date": adventure["date"],
+            "dm": adventure["dm"],
+            "players": adventure["players"],
+            "session_url": adventure["session_url"],
+        }
+
+        for participant in adventure["players"]:
+            participant_url = participant.get("character_url")
+            if not participant_url:
+                continue
+
+            character_key = known_character_urls.get(participant_url)
+            if not character_key:
+                continue
+
+            character_sessions.setdefault(character_key, []).append(session_stub)
+
+    for character_key, sessions in character_sessions.items():
+        deduped: dict[str, dict[str, Any]] = {}
+        for session in sessions:
+            deduped[session["session_key"]] = session
+
+        character_sessions[character_key] = sorted(
+            deduped.values(),
+            key=lambda s: s.get("date") or "",
+        )
+
+    return character_sessions
 
 
 def extract() -> dict[str, list[dict[str, Any]]]:
@@ -217,6 +499,13 @@ def extract() -> dict[str, list[dict[str, Any]]]:
     logging.info("Starting Westmarches extraction.")
 
     players = get_characters_page(url=ENV["WESTMARCH_URL"])
+
+    adventures_url = ENV.get(
+        "WESTMARCH_ADVENTURES_URL",
+        "https://www.westmarches.games/communities/tower-frontiers/adventures",
+    )
+    adventures = get_all_adventures(adventures_url)
+    character_session_map = build_character_session_map(players, adventures)
 
     players_out_dict: dict[str, dict[str, Any]] = {}
     characters_out: list[dict[str, Any]] = []
@@ -247,7 +536,7 @@ def extract() -> dict[str, list[dict[str, Any]]]:
 
             character_page = get_character_page(character["westmarch_url"])
             character["character_sheet"] = character_page["character_sheet"]
-            character["sessions"] = character_page["sessions"]
+            character["sessions"] = character_session_map.get(character_key, [])
 
             dnd_info = None
             if character.get("character_sheet"):
@@ -256,7 +545,6 @@ def extract() -> dict[str, list[dict[str, Any]]]:
             if dnd_info and not players_out_dict[player_key]["dnd_beyond_name"]:
                 players_out_dict[player_key]["dnd_beyond_name"] = dnd_info.get("player_name")
 
-            # Always register the character, even with no D&D Beyond sheet
             characters_out.append({
                 "character_key": character_key,
                 "character_name": character["character_name"],
@@ -265,6 +553,26 @@ def extract() -> dict[str, list[dict[str, Any]]]:
                 "race": dnd_info["race"] if dnd_info else None,
                 "player_key": player_key,
             })
+
+            # Register all linked sessions for output
+            for session in character["sessions"]:
+                session_key = session["session_key"]
+
+                if session_key not in sessions_out:
+                    sessions_out[session_key] = {
+                        "session_key": session_key,
+                        "session_name": session["session_name"],
+                        "date": session["date"],
+                        "dm_player_key": session["dm"]["discord_name"],
+                        "dm_player_name": session["dm"]["player_name"],
+                        "players": [
+                            {
+                                "player_name": p["player_name"],
+                                "character_name": p["character_name"],
+                            }
+                            for p in session["players"]
+                        ],
+                    }
 
             # No D&D Beyond data? Skip enrichment, but keep base character row.
             if not dnd_info:
@@ -294,15 +602,7 @@ def extract() -> dict[str, list[dict[str, Any]]]:
             latest_session = get_latest_past_session(character["sessions"])
 
             if latest_session:
-                session_key = latest_session["session_url"].split("/")[-1]
-
-                if session_key not in sessions_out:
-                    sessions_out[session_key] = {
-                        "session_key": session_key,
-                        "session_name": latest_session["session_name"],
-                        "date": latest_session["date"],
-                        "dm_player_key": latest_session["dm"]["discord_name"],
-                    }
+                session_key = latest_session["session_key"]
 
                 character_growth_out.append({
                     "character_key": character_key,

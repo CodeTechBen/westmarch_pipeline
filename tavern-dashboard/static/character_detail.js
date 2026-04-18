@@ -185,7 +185,7 @@ function populateSpellbook(spells, className) {
 
         row.innerHTML = `
             <a href="/spell/${spell.spell_id}" class="asset-link">
-                ✨ ${spell.spell_name}
+                ${spell.spell_name}
             </a>
             <span class="asset-meta">[Level ${spell.level} ${spell.school}]</span>
         `;

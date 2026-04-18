@@ -8,12 +8,17 @@
 <body>
 
 <header>
-    <h1>The Tavern</h1>
+    <a href="/" class="logo-link">
+            <img src="{{ url_for('static', filename='tavern_logo.png') }}" alt="The Tavern" class="logo-img">
+    </a>
     <nav>
-        <a href="#">Home</a>
-        <a href="#">Class Stats</a>
-        <a href="/sessions">Sessions</a>
-        <a href="#">Items</a>
+        <nav>
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('sessions_page') }}">Sessions</a>
+            <a href="{{ url_for('item_distribution_page')}}">Items</a>
+            <a href="{{ url_for('class_stats_page') }}">Class Stats</a>
+            <a href="{{ url_for('spell_distribution_page') }}">Spell Stats</a>
+        </nav>
     </nav>
 </header>
 

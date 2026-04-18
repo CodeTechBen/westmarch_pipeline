@@ -117,7 +117,7 @@ function populateItems(items) {
         card.href = `/item/${item.item_id}`;
 
         card.innerHTML = `
-            <div class="search-result-main">🧪 ${item.item_name}</div>
+            <div class="search-result-main">${item.item_name}</div>
             <div class="search-result-meta">[${item.rarity}]</div>
             <div class="search-result-side">Owned by: ${item.owned_by_count}</div>
         `;
@@ -143,7 +143,7 @@ function populateSpells(spells) {
         card.href = `/spell/${spell.spell_id}`;
 
         card.innerHTML = `
-            <div class="search-result-main">📜 ${spell.spell_name}</div>
+            <div class="search-result-main">${spell.spell_name}</div>
             <div class="search-result-meta">[${formatSpellLevel(spell.level)}]</div>
             <div class="search-result-side">Known by: ${spell.known_by_count} characters</div>
         `;

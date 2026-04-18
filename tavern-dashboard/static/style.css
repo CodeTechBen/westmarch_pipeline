@@ -18,6 +18,17 @@ nav a {
     text-decoration: none;
 }
 
+.logo-link {
+    display: inline-block;
+    text-decoration: none;
+}
+
+.logo-img {
+    height: 48px; /* adjust as needed */
+    width: auto;
+    display: block;
+}
+
 .title-box {
     text-align: center;
     padding: 20px;
@@ -1139,5 +1150,499 @@ input {
 
     .search-header-row {
         flex-direction: column;
+    }
+}
+.reward-distribution-page {
+    max-width: 1150px;
+    margin: 0 auto;
+    padding: 24px;
+    background-color: #f4f4f4;
+}
+
+.reward-page-header,
+.reward-filters-card,
+.reward-table-section,
+.reward-chart-section,
+.reward-donut-section,
+.reward-existing-section {
+    margin-bottom: 28px;
+}
+
+.reward-page-header h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+.reward-filters-card {
+    background: white;
+    border-left: 6px solid #2e7d32;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.reward-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    gap: 18px 24px;
+    margin-top: 16px;
+}
+
+.filter-group label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #444;
+}
+
+.filter-group select,
+.filter-group input[type="date"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: white;
+    font-size: 15px;
+    box-sizing: border-box;
+}
+
+.date-range-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.chart-card {
+    background: white;
+    padding: 20px;
+    border-left: 6px solid #2e7d32;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.reward-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.reward-table th,
+.reward-table td {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+}
+
+.reward-table th {
+    background: #f9f9f9;
+}
+
+.reward-table tbody tr:hover {
+    background: #f1f8f2;
+}
+
+.reward-chart-section {
+    clear: both;
+}
+
+.reward-bar-chart-card {
+    position: relative;
+    height: 520px;
+    min-height: 520px;
+}
+
+#rewardDistributionChart {
+    display: block;
+    width: 100% !important;
+    height: calc(100% - 48px) !important;
+}
+
+.reward-donut-section {
+    margin-top: 8px;
+}
+
+.reward-donut-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.reward-donut-card {
+    position: relative;
+    height: 420px;
+    min-height: 420px;
+}
+
+#itemTypeDonutChart,
+#itemRarityDonutChart {
+    display: block;
+    width: 100% !important;
+    height: calc(100% - 48px) !important;
+}
+
+.existing-section-list {
+    margin: 0;
+    padding-left: 20px;
+    color: #444;
+    line-height: 1.8;
+}
+
+@media (max-width: 900px) {
+    .reward-filters-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .date-range-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .reward-bar-chart-card {
+        height: 420px;
+        min-height: 420px;
+    }
+
+    .reward-donut-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .reward-donut-card {
+        height: 360px;
+        min-height: 360px;
+    }
+}
+
+.empty-state {
+    background: white;
+    padding: 20px;
+    margin: 20px auto;
+    width: 80%;
+    border-left: 6px solid #ccc;
+    border-radius: 6px;
+    color: #555;
+}
+
+/* =========================
+   CLASS STATS PAGE
+========================= */
+
+.class-stats-page {
+    max-width: 1150px;
+    margin: 0 auto;
+    padding: 24px;
+    background-color: #f4f4f4;
+}
+
+.class-stats-header {
+    margin-bottom: 24px;
+}
+
+.class-stats-header h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+.class-stats-subtitle {
+    color: #555;
+    margin-top: 12px;
+}
+
+.class-stats-filters-card {
+    background: white;
+    border-left: 6px solid #2e7d32;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    margin-bottom: 28px;
+}
+
+.class-stats-filters-row {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-group select {
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: white;
+}
+
+.checkbox-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.class-distribution-chart-card {
+    height: 520px;
+    margin-bottom: 32px;
+}
+
+#classDistributionChart {
+    width: 100% !important;
+    height: calc(100% - 48px) !important;
+    display: block;
+}
+
+.subclass-breakdown-section {
+    margin-bottom: 32px;
+}
+
+.subclass-group {
+    background: white;
+    border-left: 6px solid #2e7d32;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+
+.subclass-group-header {
+    width: 100%;
+    background: white;
+    border: none;
+    text-align: left;
+    padding: 16px 18px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.subclass-group-header:hover {
+    background: #f1f8f2;
+}
+
+.subclass-group-body {
+    padding: 0 18px 16px;
+}
+
+.subclass-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid #eee;
+}
+
+.multiclass-section {
+    margin-top: 32px;
+    margin-bottom: 32px;
+}
+
+.multiclass-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.multiclass-view-toggle {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.multiclass-toggle-btn {
+    padding: 10px 14px;
+    border: 1px solid #cfcfcf;
+    border-radius: 999px;
+    background: white;
+    color: #333;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.multiclass-toggle-btn:hover {
+    background: #f1f8f2;
+}
+
+.multiclass-toggle-btn.active {
+    background: #2e7d32;
+    color: white;
+    border-color: #2e7d32;
+}
+
+.multiclass-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.multiclass-table th,
+.multiclass-table td {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.multiclass-table th {
+    background: #f9f9f9;
+}
+
+.multiclass-table tbody tr:hover {
+    background: #f1f8f2;
+}
+
+.multiclass-sankey-container {
+    background: white;
+    border-left: 6px solid #2e7d32;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    padding: 20px;
+}
+
+.sankey-row {
+    margin-bottom: 18px;
+}
+
+.sankey-labels {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.sankey-arrow {
+    color: #2e7d32;
+}
+
+.sankey-bar-wrap {
+    position: relative;
+    background: #edf5ee;
+    height: 28px;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.sankey-bar {
+    height: 100%;
+    background: #2e7d32;
+    border-radius: 999px;
+}
+
+.sankey-count {
+    position: absolute;
+    right: 12px;
+    top: 4px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+@media (max-width: 900px) {
+    .class-distribution-chart-card {
+        height: 420px;
+    }
+}
+
+/* =========================
+   SPELL DISTRIBUTION PAGE
+========================= */
+
+.spell-distribution-page {
+    max-width: 1150px;
+    margin: 0 auto;
+    padding: 24px;
+    background-color: #f4f4f4;
+}
+
+.spell-distribution-header,
+.spell-distribution-filters-card,
+.spell-top-section,
+.spell-top-chart-section,
+.spell-class-school-section,
+.spell-level-section,
+.spell-crossref-section,
+.spell-insights-section {
+    margin-bottom: 28px;
+}
+
+.spell-distribution-header h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+.spell-distribution-filters-card {
+    background: white;
+    border-left: 6px solid #2e7d32;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+
+.spell-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+    gap: 18px 24px;
+    margin-top: 16px;
+}
+
+.spell-top-table,
+.spell-crossref-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.spell-top-table th,
+.spell-top-table td,
+.spell-crossref-table th,
+.spell-crossref-table td {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.spell-top-table th,
+.spell-crossref-table th {
+    background: #f9f9f9;
+}
+
+.spell-top-table tbody tr:hover,
+.spell-crossref-table tbody tr:hover {
+    background: #f1f8f2;
+}
+
+.spell-chart-card {
+    height: 460px;
+    position: relative;
+}
+
+#topSpellsChart,
+#classSchoolChart,
+#spellLevelChart {
+    width: 100% !important;
+    height: calc(100% - 48px) !important;
+    display: block;
+}
+
+.spell-insights-list {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 1.9;
+    color: #444;
+}
+
+@media (max-width: 900px) {
+    .spell-filter-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .spell-chart-card {
+        height: 380px;
     }
 }

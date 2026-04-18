@@ -198,15 +198,16 @@ def load_sessions(
 
     sessions = data.get("sessions", [])
     unique_sessions: dict[str, dict[str, any]] = {}
+
     for session in sessions:
+        session_key = session.get("session_key")
         session_name = session.get("session_name")
         session_date = session.get("date")
-        dm = session.get("dm", {})
 
         dm_player = {
-            "discord_name": dm.get("discord_name"),
-            "name": dm.get("player_name"),
-            "dnd_beyond_name": None  
+            "discord_name": session.get("dm_player_key"),
+            "player_name": session.get("dm_player_name"),
+            "dnd_beyond_name": None
         }
 
         dm_id = find_existing_player(
@@ -216,24 +217,30 @@ def load_sessions(
             dnd_map
         )
 
-        if session_name and session_name not in unique_sessions:
-            unique_sessions[session_name] = {
-                "date": session_date,
-                "dm_id": dm_id
-            }
+        if not session_key:
+            logging.warning(f"Skipping session with no session_key: {session_name}")
+            continue
+
+        unique_sessions[session_key] = {
+            "session_name": session_name,
+            "date": session_date,
+            "dm_id": dm_id
+        }
 
     with conn.cursor() as cur:
-        for session_name, session_data in unique_sessions.items():
-            logging.info(f"Loading session: {session_name}")
+        for session_key, session_data in unique_sessions.items():
+            logging.info(f"Loading session: {session_data['session_name']} ({session_key})")
 
             cur.execute("""
-                INSERT INTO session (session_name, date, dm_player_id)
-                VALUES (%s, %s, %s)
+                INSERT INTO session (session_key, session_name, date, dm_player_id)
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (session_name) DO UPDATE SET
+                    session_key = EXCLUDED.session_key,
                     date = EXCLUDED.date,
                     dm_player_id = EXCLUDED.dm_player_id
             """, (
-                session_name,
+                session_key,
+                session_data["session_name"],
                 session_data["date"],
                 session_data["dm_id"]
             ))

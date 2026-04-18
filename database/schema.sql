@@ -58,7 +58,7 @@ CREATE TABLE character (
     dnd_beyond_id VARCHAR(100),
     picture_url VARCHAR(255),
     player_id INT NOT NULL,
-    race_id INT NOT NULL,
+    race_id INT,
     starting_level INT NOT NULL DEFAULT 1,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 

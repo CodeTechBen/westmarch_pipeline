@@ -1,224 +1,381 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any, Iterator
+import re
+from typing import Any, Optional
+
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 
-def load_character_file(path: str) -> dict[str, Any]:
-    raw = Path(path).read_text(encoding="utf-8").strip()
+BASE_URL = "https://www.westmarches.games"
+ADVENTURES_URL = "https://www.westmarches.games/communities/tower-frontiers/adventures"
 
-    try:
-        data = json.loads(raw)
-        if isinstance(data, dict):
-            return data
-    except json.JSONDecodeError:
-        pass
 
-    try:
-        wrapped = "{\n" + raw + "\n}"
-        data = json.loads(wrapped)
-        if isinstance(data, dict):
-            return data
-    except json.JSONDecodeError:
-        pass
+def setup_selenium() -> webdriver.Chrome:
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--window-size=1920,1080")
+    return webdriver.Chrome(options=options)
 
-    raise ValueError(
-        f"Could not parse {path} as JSON. "
-        "Expected either a JSON object or a name-to-payload mapping."
+
+def get_page_soup(
+    driver: webdriver.Chrome,
+    url: str,
+    output_file: Optional[str] = None
+) -> BeautifulSoup:
+    driver.get(url)
+    WebDriverWait(driver, 15).until(
+        EC.presence_of_element_located((By.TAG_NAME, "body"))
     )
 
+    html = driver.page_source
+    if output_file:
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(html)
 
-def unwrap_payload(character_blob: dict[str, Any]) -> dict[str, Any]:
-    current: Any = character_blob
-    safety = 0
+    return BeautifulSoup(html, "html.parser")
 
-    while isinstance(current, dict) and isinstance(current.get("data"), dict):
-        current = current["data"]
-        safety += 1
-        if safety > 10:
+
+def clean_text(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    cleaned = " ".join(value.split()).strip()
+    return cleaned or None
+
+
+def get_adventure_links(soup: BeautifulSoup) -> list[str]:
+    links: list[str] = []
+    seen: set[str] = set()
+
+    for a in soup.select('a[href*="/adventures/"]'):
+        href = a.get("href", "").strip()
+        if not href:
+            continue
+
+        if "/communities/" not in href or "/adventures/" not in href:
+            continue
+
+        full_url = BASE_URL + href if href.startswith("/") else href
+
+        if full_url in seen:
+            continue
+
+        seen.add(full_url)
+        links.append(full_url)
+
+    return links
+
+def debug_first_participant_blocks(soup: BeautifulSoup) -> None:
+    print("\n=== DEBUG: visible participant blocks ===")
+
+    blocks = soup.select("div.MuiPaper-root")
+    print(f"Total MuiPaper blocks: {len(blocks)}")
+
+    found = 0
+
+    for idx, block in enumerate(blocks):
+        text = " ".join(block.stripped_strings)
+
+        # Only inspect blocks that look like participant cards
+        if "APPROVED" not in text:
+            continue
+        if "/characters/" not in str(block):
+            continue
+
+        found += 1
+        print(f"\n--- Participant block #{found} (paper index {idx}) ---")
+        print(text[:800])
+
+        char_link = block.select_one('a[href*="/characters/"]')
+        if char_link:
+            print("char_link href:", char_link.get("href"))
+
+        title_link = block.select_one('a.MuiTypography-root.MuiTypography-h6[href*="/characters/"]')
+        print("title_link found:", bool(title_link))
+        if title_link:
+            print("title_link text:", title_link.get_text(" ", strip=True))
+
+        aria_owner = block.select_one('[aria-label^="@"]')
+        print("aria owner found:", bool(aria_owner))
+        if aria_owner:
+            print("aria-label:", aria_owner.get("aria-label"))
+
+        owner_img = block.select_one('[aria-label^="@"] img[alt]')
+        print("owner img found:", bool(owner_img))
+        if owner_img:
+            print("owner img alt:", owner_img.get("alt"))
+
+        char_img = block.select_one('.avatar-image img[alt]')
+        print("character img found:", bool(char_img))
+        if char_img:
+            print("character img alt:", char_img.get("alt"))
+
+        if found >= 3:
             break
 
-    if not isinstance(current, dict):
-        raise ValueError(f"Expected dict payload after unwrapping, got {type(current).__name__}")
-
-    return current
+    print(f"\nVisible participant-like blocks found: {found}")
 
 
-def iter_payloads(raw_data: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
-    if isinstance(raw_data, dict) and isinstance(raw_data.get("data"), dict):
-        payload = unwrap_payload(raw_data)
-        yield str(payload.get("name", "Unknown Character")), payload
-        return
+def debug_participant_regex(soup: BeautifulSoup) -> None:
+    print("\n=== DEBUG: regex participant matches ===")
 
-    for character_name, character_blob in raw_data.items():
-        if not isinstance(character_blob, dict):
+    html = str(soup)
+
+    participant_pattern = re.compile(
+        r'"character":\{.*?"name":"([^"]+)".*?"user":\{.*?"name":"([^"]+)"',
+        re.DOTALL,
+    )
+
+    matches = list(participant_pattern.finditer(html))
+    print("regex match count:", len(matches))
+
+    for i, match in enumerate(matches[:10], start=1):
+        print(f"{i}. character={match.group(1)!r}, player={match.group(2)!r}")
+
+
+def extract_title_from_meta(soup: BeautifulSoup) -> Optional[str]:
+    og_title = soup.find("meta", attrs={"property": "og:title"})
+    if og_title and og_title.get("content"):
+        title = clean_text(og_title["content"])
+        if title:
+            title = re.sub(
+                r"\s*-\s*Tower Frontiers\s*-\s*WestMarches\.games\s*$",
+                "",
+                title,
+            )
+            return title
+
+    twitter_title = soup.find("meta", attrs={"name": "twitter:title"})
+    if twitter_title and twitter_title.get("content"):
+        title = clean_text(twitter_title["content"])
+        if title:
+            title = re.sub(r"\s*-\s*Tower Frontiers\s*$", "", title)
+            return title
+
+    return None
+
+
+def extract_gm_from_visible_html(soup: BeautifulSoup) -> tuple[Optional[str], Optional[str]]:
+    """
+    Best source: the visible GM card on the adventure detail page.
+    """
+    gm_link = None
+
+    for a in soup.select('a[href*="/gm/"]'):
+        text = clean_text(a.get_text(" ", strip=True))
+        if text and "Game Master" in text:
+            gm_link = a
+            break
+
+    if not gm_link:
+        return None, None
+
+    # Prefer visible GM name
+    player_name = None
+    name_tag = gm_link.select_one("p")
+    if name_tag:
+        player_name = clean_text(name_tag.get_text(" ", strip=True))
+
+    # Fallback to avatar alt
+    if not player_name:
+        img = gm_link.select_one("img[alt]")
+        if img:
+            player_name = clean_text(img.get("alt"))
+
+    # Discord name often isn't exposed visibly here, so fallback to same value
+    discord_name = player_name
+
+    return discord_name, player_name
+
+
+def extract_gm_from_scripts(soup: BeautifulSoup) -> tuple[Optional[str], Optional[str]]:
+    """
+    Fallback: extract GM info from embedded page data.
+    On this page, nickname = 'Graham (Forever DM)' and displayName = 'Kisho'.
+    We want the nickname for the visible campaign-facing name.
+    """
+    html = str(soup)
+
+    # Prefer nickname, because that's what the page displays for the GM
+    gm_match = re.search(
+        r'"gm":\{.*?"nicknames":\{.*?"nickname":"([^"]+)".*?"displayName":"([^"]+)"',
+        html,
+        re.DOTALL,
+    )
+    if gm_match:
+        nickname = clean_text(gm_match.group(1))
+        display_name = clean_text(gm_match.group(2))
+        return nickname, nickname or display_name
+
+    gm_match = re.search(
+        r'"gmInfo":\{.*?"user":\{.*?"nicknames":\{.*?"nickname":"([^"]+)".*?"displayName":"([^"]+)"',
+        html,
+        re.DOTALL,
+    )
+    if gm_match:
+        nickname = clean_text(gm_match.group(1))
+        display_name = clean_text(gm_match.group(2))
+        return nickname, nickname or display_name
+
+    return None, None
+
+
+def extract_players_from_visible_html(soup: BeautifulSoup) -> list[dict[str, str]]:
+    """
+    Extract players from the visible participant cards.
+    """
+    players: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for block in soup.select("div.MuiPaper-root"):
+        text = " ".join(block.stripped_strings)
+
+        # Participant cards include APPROVED and a character link
+        if "APPROVED" not in text:
             continue
-        payload = unwrap_payload(character_blob)
-        yield character_name, payload
+        if not block.select_one('a[href*="/characters/"]'):
+            continue
+
+        title_link = block.select_one(
+            'a.MuiTypography-root.MuiTypography-h6[href*="/characters/"]'
+        )
+        if not title_link:
+            continue
+
+        character_name = clean_text(title_link.get_text(" ", strip=True))
+
+        owner = block.select_one('[aria-label^="@"]')
+        player_name = None
+
+        if owner:
+            aria = clean_text(owner.get("aria-label"))
+            if aria:
+                player_name = aria.removeprefix("@")
+
+            body_text = owner.get_text(" ", strip=True)
+            if body_text:
+                # Prefer visible text if present
+                player_name = clean_text(body_text) or player_name
+
+        if not character_name or not player_name:
+            continue
+
+        key = (player_name, character_name)
+        if key in seen:
+            continue
+
+        seen.add(key)
+        players.append({
+            "player_name": player_name,
+            "character_name": character_name,
+        })
+
+    return players
 
 
-def walk_json(node: Any):
-    if isinstance(node, dict):
-        yield node
-        for value in node.values():
-            yield from walk_json(value)
-    elif isinstance(node, list):
-        for item in node:
-            yield from walk_json(item)
-
-
-def iter_spell_entries(node: Any):
+def extract_players_from_scripts(soup: BeautifulSoup) -> list[dict[str, str]]:
     """
-    Recursively yields dicts that look like actual spell entries:
-    they contain a `definition` dict with a spell name.
+    Extract participant character/player pairs from embedded script data.
     """
-    if isinstance(node, dict):
-        definition = node.get("definition")
-        if isinstance(definition, dict) and definition.get("name"):
-            yield node
-        else:
-            for value in node.values():
-                yield from iter_spell_entries(value)
-    elif isinstance(node, list):
-        for item in node:
-            yield from iter_spell_entries(item)
+    html = str(soup)
+
+    participant_pattern = re.compile(
+        r'"character":\{[^{}]*?"name":"([^"]+)"(?:.|\n)*?"user":\{[^{}]*?"name":"([^"]+)"',
+        re.DOTALL,
+    )
+
+    players: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for match in participant_pattern.finditer(html):
+        character_name = clean_text(match.group(1))
+        player_name = clean_text(match.group(2))
+
+        if not character_name or not player_name:
+            continue
+
+        key = (player_name, character_name)
+        if key in seen:
+            continue
+
+        seen.add(key)
+        players.append({
+            "player_name": player_name,
+            "character_name": character_name,
+        })
+
+    return players
 
 
-def summarize_structure(node: Any, depth: int = 0, max_depth: int = 3) -> str:
-    """
-    Gives a short structural summary of a nested object.
-    """
-    if depth > max_depth:
-        return "..."
+def extract_session_from_adventure_page(soup: BeautifulSoup, session_url: str) -> dict[str, Any]:
+    session_name = extract_title_from_meta(soup)
 
-    if isinstance(node, dict):
-        keys = list(node.keys())
-        preview = ", ".join(map(str, keys[:8]))
-        if len(keys) > 8:
-            preview += ", ..."
-        return f"dict(keys=[{preview}])"
+    if not session_name:
+        title_tag = soup.select_one("h1")
+        if title_tag:
+            session_name = clean_text(title_tag.get_text(" ", strip=True))
 
-    if isinstance(node, list):
-        if not node:
-            return "list(empty)"
-        first = summarize_structure(node[0], depth + 1, max_depth)
-        return f"list(len={len(node)}, first={first})"
+    time_tag = soup.select_one("time[datetime]")
+    session_date = time_tag.get("datetime") if time_tag else None
 
-    return type(node).__name__
+    dm_discord, dm_name = extract_gm_from_visible_html(soup)
+    if not dm_discord and not dm_name:
+        dm_discord, dm_name = extract_gm_from_scripts(soup)
 
+    players = extract_players_from_visible_html(soup)
+    if not players:
+        players = extract_players_from_scripts(soup)
 
-def debug_spell_locations(data: dict[str, Any]) -> None:
-    print("\nTop-level keys:")
-    print(sorted(data.keys()))
-
-    for root_key in ["spells", "classSpells", "classes"]:
-        if root_key in data:
-            print(f"\n{root_key!r} structure:")
-            print(summarize_structure(data[root_key]))
-
-    if "spells" in data and isinstance(data["spells"], dict):
-        print("\nspells buckets:")
-        for key, value in data["spells"].items():
-            print(f"  spells[{key!r}] -> {summarize_structure(value)}")
-
-    if "classSpells" in data:
-        print("\nclassSpells preview:")
-        print(summarize_structure(data["classSpells"]))
-
-    if "classes" in data and isinstance(data["classes"], list):
-        print("\nclasses spell-related keys:")
-        for i, cls in enumerate(data["classes"]):
-            if not isinstance(cls, dict):
-                continue
-            class_name = cls.get("definition", {}).get("name", f"class_{i}")
-            spellish_keys = [k for k in cls.keys() if "spell" in str(k).lower()]
-            print(f"  {class_name}: {spellish_keys}")
-
-
-def collect_spells_by_root(data: dict[str, Any]) -> dict[str, list[str]]:
-    results: dict[str, list[str]] = {}
-
-    candidate_roots = {
-        "spells": data.get("spells"),
-        "classSpells": data.get("classSpells"),
-        "classes": data.get("classes"),
+    return {
+        "session_name": session_name,
+        "date": session_date,
+        "dm": {
+            "discord_name": dm_discord,
+            "player_name": dm_name,
+        },
+        "players": players,
+        "session_url": session_url,
     }
-
-    for root_name, root in candidate_roots.items():
-        if root is None:
-            continue
-
-        names: list[str] = []
-        seen: set[tuple[str, Any]] = set()
-
-        for entry in iter_spell_entries(root):
-            definition = entry.get("definition", {})
-            spell_name = definition.get("name")
-            spell_level = definition.get("level")
-            key = (str(spell_name), spell_level)
-
-            if key in seen:
-                continue
-            seen.add(key)
-
-            names.append(f"{spell_name} (lvl {spell_level})")
-
-        results[root_name] = sorted(names)
-
-    return results
-
-
-def print_spell_summary(spell_map: dict[str, list[str]]) -> None:
-    print("\nSpell summary by root:")
-    for root_name, spells in spell_map.items():
-        print(f"\n[{root_name}] count={len(spells)}")
-        for spell in spells[:25]:
-            print(f"  - {spell}")
-        if len(spells) > 25:
-            print(f"  ... and {len(spells) - 25} more")
-
-
-def compare_roots(spell_map: dict[str, list[str]]) -> None:
-    sets = {k: set(v) for k, v in spell_map.items()}
-
-    if "spells" in sets and "classSpells" in sets:
-        only_in_spells = sorted(sets["spells"] - sets["classSpells"])
-        only_in_class_spells = sorted(sets["classSpells"] - sets["spells"])
-
-        print("\nComparison: spells vs classSpells")
-        print(f"  Only in spells: {len(only_in_spells)}")
-        for spell in only_in_spells[:15]:
-            print(f"    - {spell}")
-        if len(only_in_spells) > 15:
-            print(f"    ... and {len(only_in_spells) - 15} more")
-
-        print(f"  Only in classSpells: {len(only_in_class_spells)}")
-        for spell in only_in_class_spells[:15]:
-            print(f"    - {spell}")
-        if len(only_in_class_spells) > 15:
-            print(f"    ... and {len(only_in_class_spells) - 15} more")
 
 
 def main() -> None:
-    file_path = "character_sheets.txt"
-    raw_data = load_character_file(file_path)
+    driver = setup_selenium()
 
-    found_any = False
-    for label, payload in iter_payloads(raw_data):
-        found_any = True
+    try:
+        adventures_list_soup = get_page_soup(
+            driver,
+            ADVENTURES_URL,
+            output_file="adventures_list.html",
+        )
 
-        print("=" * 100)
-        print(f"Character: {payload.get('name')} ({label})")
+        adventure_links = get_adventure_links(adventures_list_soup)
 
-        debug_spell_locations(payload)
-        spell_map = collect_spells_by_root(payload)
-        print_spell_summary(spell_map)
-        compare_roots(spell_map)
+        if not adventure_links:
+            print(json.dumps([], indent=2))
+            return
 
-    if not found_any:
-        raise ValueError("No valid character payloads found in character_sheets.txt")
+        first_url = adventure_links[0]
+        soup = get_page_soup(driver, first_url, output_file="adventure_page.html")
 
+        print("Testing URL:", first_url)
+
+        debug_first_participant_blocks(soup)
+        debug_participant_regex(soup)
+
+        print("\nVisible extractor result:")
+        print(json.dumps(extract_players_from_visible_html(soup), indent=2))
+
+        print("\nScript extractor result:")
+        print(json.dumps(extract_players_from_scripts(soup), indent=2))
+
+    finally:
+        driver.quit()
 
 if __name__ == "__main__":
     main()
