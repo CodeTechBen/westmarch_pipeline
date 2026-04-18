@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="sessions-page">
+
+    <section class="sessions-header">
+        <div class="sessions-header-row">
+            <h1 class="sessions-title">Sessions</h1>
+
+            <div class="sessions-filter-group">
+                <label for="dm-filter">Filter by DM</label>
+                <select id="dm-filter" class="sessions-filter-select">
+                    <option value="">All DMs</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section-rule thick"></div>
+    </section>
+
+    <section class="sessions-list-section">
+        <div id="sessions-container" class="sessions-list"></div>
+    </section>
+
+    <section class="sessions-load-more-section">
+        <button id="load-more" class="load-more-btn" type="button">Load More Sessions</button>
+    </section>
+
+</div>
+
+<script src="{{ url_for('static', filename='sessions.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="item-detail-page">
+
+    <a href="/" class="back-link">← Back to Home</a>
+
+    <section class="item-header-card">
+        <div class="item-header-top">
+            <div>
+                <h1 id="item-title">ITEM NAME</h1>
+                <div class="section-rule thick"></div>
+                <div id="item-subtitle" class="item-subtitle">Type | Rarity</div>
+            </div>
+
+            <div id="item-magical-badge" class="item-magical-badge" style="display: none;">
+                🔥 Magical
+            </div>
+        </div>
+    </section>
+
+    <section class="item-tags-section">
+        <h2 class="section-title">TAGS</h2>
+        <div class="section-rule"></div>
+        <div id="item-tags" class="tag-list"></div>
+    </section>
+
+    <section class="item-description-section">
+        <h2 class="section-title">DESCRIPTION</h2>
+        <div class="section-rule"></div>
+        <p id="item-description" class="item-description-text"></p>
+    </section>
+
+    <section class="item-owners-section">
+        <h2 class="section-title">
+            CHARACTERS WHO OWN THIS ITEM <span id="owner-count">(0)</span>
+        </h2>
+        <div class="section-rule thick"></div>
+
+        <div class="table-wrapper">
+            <table class="item-owners-table">
+                <thead>
+                    <tr>
+                        <th>Character</th>
+                        <th>Player</th>
+                        <th>Class</th>
+                        <th>Qty</th>
+                        <th>Active</th>
+                    </tr>
+                </thead>
+                <tbody id="item-owners-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="item-rarity-chart-section">
+        <h2 class="section-title">RARITY DISTRIBUTION ACROSS CAMPAIGN</h2>
+        <div class="section-rule"></div>
+
+        <div class="chart-card">
+            <canvas id="rarityDistributionChart"></canvas>
+        </div>
+    </section>
+
+</div>
+
+<script>
+    const itemId = {{ item_id|tojson }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='item_detail.js') }}"></script>
+{% endblock %}

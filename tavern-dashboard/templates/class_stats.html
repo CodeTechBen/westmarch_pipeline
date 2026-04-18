@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="class-stats-page">
+
+    <section class="class-stats-header">
+        <h1>Class &amp; Subclass Distribution</h1>
+        <div class="section-rule thick"></div>
+        <p class="class-stats-subtitle">
+            Overview of class and subclass distribution across characters.
+        </p>
+    </section>
+
+    <section class="class-stats-filters-card">
+        <div class="class-stats-filters-row">
+            <div class="filter-group">
+                <label for="tier-filter">Filter:</label>
+                <select id="tier-filter">
+                    <option value="all">All Tiers</option>
+                    <option value="1">Tier 1</option>
+                    <option value="2">Tier 2</option>
+                    <option value="3">Tier 3</option>
+                    <option value="4">Tier 4</option>
+                </select>
+            </div>
+
+            <div class="filter-group checkbox-group">
+                <label for="active-only-filter">Active Only</label>
+                <input type="checkbox" id="active-only-filter" checked>
+            </div>
+        </div>
+    </section>
+
+    <section class="class-distribution-section">
+        <div class="chart-card class-distribution-chart-card">
+            <h2 class="section-title">CLASS DISTRIBUTION</h2>
+            <div class="section-rule"></div>
+            <canvas id="classDistributionChart"></canvas>
+        </div>
+    </section>
+
+    <section class="subclass-breakdown-section">
+        <h2 class="section-title">SUBCLASS BREAKDOWN</h2>
+        <div class="section-rule"></div>
+        <div id="subclass-breakdown-container"></div>
+    </section>
+
+    <section class="multiclass-section">
+        <div class="multiclass-header">
+            <h2 class="section-title">MULTICLASS COMBINATIONS</h2>
+
+            <div class="multiclass-view-toggle">
+                <button id="multiclass-table-btn" class="multiclass-toggle-btn active" type="button">
+                    Table View
+                </button>
+                <button id="multiclass-sankey-btn" class="multiclass-toggle-btn" type="button">
+                    Sankey View
+                </button>
+            </div>
+        </div>
+
+        <div class="section-rule"></div>
+
+        <div id="multiclass-table-view" class="multiclass-view">
+            <div class="table-wrapper">
+                <table class="multiclass-table">
+                    <thead>
+                        <tr>
+                            <th>Class A</th>
+                            <th>Class B</th>
+                            <th>Characters</th>
+                        </tr>
+                    </thead>
+                    <tbody id="multiclass-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="multiclass-sankey-view" class="multiclass-view" style="display: none;">
+            <div id="multiclass-sankey-container" class="multiclass-sankey-container"></div>
+        </div>
+    </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='class_stats.js') }}"></script>
+{% endblock %}

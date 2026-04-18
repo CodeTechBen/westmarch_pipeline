@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="spell-distribution-page">
+
+    <section class="spell-distribution-header">
+        <h1>Spell Distribution Dashboard</h1>
+        <div class="section-rule thick"></div>
+    </section>
+
+    <section class="spell-distribution-filters-card">
+        <h2 class="section-title">Filters:</h2>
+
+        <div class="spell-filter-grid">
+            <div class="filter-group">
+                <label for="spell-tier-filter">Tier:</label>
+                <select id="spell-tier-filter">
+                    <option value="all">All</option>
+                    <option value="1">Tier 1</option>
+                    <option value="2">Tier 2</option>
+                    <option value="3">Tier 3</option>
+                    <option value="4">Tier 4</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="spell-class-filter">Class:</label>
+                <select id="spell-class-filter">
+                    <option value="all">All</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="spell-school-filter">School:</label>
+                <select id="spell-school-filter">
+                    <option value="all">All</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="spell-level-filter">Level:</label>
+                <select id="spell-level-filter">
+                    <option value="any">Any</option>
+                    <option value="0">Cantrip</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="spell-date-from">Date Range:</label>
+                <div class="date-range-row">
+                    <input type="date" id="spell-date-from">
+                    <span>to</span>
+                    <input type="date" id="spell-date-to">
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label for="spell-tag-filter">Tag:</label>
+                <select id="spell-tag-filter">
+                    <option value="">All Tags</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <section class="spell-top-section">
+        <div class="chart-card">
+            <h2 class="section-title">TOP SPELLS</h2>
+            <div class="section-rule"></div>
+
+            <div class="table-wrapper">
+                <table class="spell-top-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Spell Name</th>
+                            <th>Level</th>
+                            <th>School</th>
+                            <th>Known By</th>
+                            <th>Tag</th>
+                        </tr>
+                    </thead>
+                    <tbody id="top-spells-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="spell-top-chart-section">
+        <div class="chart-card spell-chart-card">
+            <h2 class="section-title">Most Learned Spells</h2>
+            <div class="section-rule"></div>
+            <canvas id="topSpellsChart"></canvas>
+        </div>
+    </section>
+
+    <section class="spell-class-school-section">
+        <div class="chart-card spell-chart-card">
+            <h2 class="section-title">SPELL KNOWLEDGE BY CLASS</h2>
+            <div class="section-rule"></div>
+            <canvas id="classSchoolChart"></canvas>
+        </div>
+    </section>
+
+    <section class="spell-level-section">
+        <div class="chart-card spell-chart-card">
+            <h2 class="section-title">SPELL LEVEL DISTRIBUTION</h2>
+            <div class="section-rule"></div>
+            <canvas id="spellLevelChart"></canvas>
+        </div>
+    </section>
+
+    <section class="spell-crossref-section">
+        <div class="chart-card">
+            <h2 class="section-title">SPELL TAG FILTER + CROSS-REFERENCE</h2>
+            <div class="section-rule"></div>
+
+            <div class="table-wrapper">
+                <table class="spell-crossref-table">
+                    <thead>
+                        <tr>
+                            <th>Character</th>
+                            <th>Player</th>
+                            <th>Spell</th>
+                            <th>Level</th>
+                            <th>School</th>
+                        </tr>
+                    </thead>
+                    <tbody id="spell-crossref-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="spell-insights-section">
+        <div class="chart-card">
+            <h2 class="section-title">Insights Panel</h2>
+            <div class="section-rule"></div>
+            <ul id="spell-insights-list" class="spell-insights-list"></ul>
+        </div>
+    </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='spell_distribution.js') }}"></script>
+{% endblock %}

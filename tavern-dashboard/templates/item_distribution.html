@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="reward-distribution-page">
+
+    <section class="reward-page-header">
+        <h1>Item &amp; Reward Distribution</h1>
+        <div class="section-rule thick"></div>
+    </section>
+
+    <section class="reward-filters-card">
+        <h2 class="section-title">FILTERS:</h2>
+
+        <div class="reward-filters-grid">
+            <div class="filter-group">
+                <label for="tier-filter">Tier:</label>
+                <select id="tier-filter">
+                    <option value="all">All</option>
+                    <option value="1">Tier 1</option>
+                    <option value="2">Tier 2</option>
+                    <option value="3">Tier 3</option>
+                    <option value="4">Tier 4</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="date-from">Date Range:</label>
+                <div class="date-range-row">
+                    <input type="date" id="date-from">
+                    <span>–</span>
+                    <input type="date" id="date-to">
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label for="rank-by-filter">Rank by:</label>
+                <select id="rank-by-filter">
+                    <option value="character">Character</option>
+                    <option value="player">Player</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="value-filter">Value:</label>
+                <select id="value-filter">
+                    <option value="gold">Gold</option>
+                    <option value="items">Items</option>
+                    <option value="both">Both</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <section class="reward-table-section">
+        <div class="chart-card">
+            <h2 class="section-title">RANKED WEALTH TABLE</h2>
+            <div class="section-rule"></div>
+
+            <div class="table-wrapper">
+                <table class="reward-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Character / Player</th>
+                            <th>Tier</th>
+                            <th>Gold</th>
+                            <th>#Items</th>
+                            <th>Avg-Rarity</th>
+                            <th>Both-Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reward-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="reward-chart-section">
+        <div class="chart-card reward-bar-chart-card">
+            <h2 id="reward-chart-title" class="section-title">Richest to Poorest — Combined Wealth</h2>
+            <div class="section-rule"></div>
+            <canvas id="rewardDistributionChart"></canvas>
+        </div>
+    </section>
+
+    <section class="reward-donut-section">
+        <div class="reward-donut-grid">
+            <div class="chart-card reward-donut-card">
+                <h2 class="section-title">ITEM TYPE DISTRIBUTION</h2>
+                <div class="section-rule"></div>
+                <canvas id="itemTypeDonutChart"></canvas>
+            </div>
+
+            <div class="chart-card reward-donut-card">
+                <h2 class="section-title">ITEM RARITY DISTRIBUTION</h2>
+                <div class="section-rule"></div>
+                <canvas id="itemRarityDonutChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <section class="reward-existing-section">
+        <div class="chart-card">
+            <h2 class="section-title">EXISTING SECTIONS (as before)</h2>
+            <div class="section-rule"></div>
+            <ul class="existing-section-list">
+                <li>Rarity by Tier stacked bar chart</li>
+                <li>Item Type Distribution donut chart</li>
+                <li>Gold over time line graph</li>
+                <li>Spell popularity list</li>
+            </ul>
+        </div>
+    </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='item_distribution.js') }}"></script>
+{% endblock %}

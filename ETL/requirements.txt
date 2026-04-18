@@ -8,3 +8,5 @@ rich
 webdriver_manager
 psycopg2[binary]
 python-dotenv
+streamlit
+flask

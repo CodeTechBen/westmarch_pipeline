@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>The Tavern Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<header>
+    <a href="/" class="logo-link">
+            <img src="{{ url_for('static', filename='tavern_logo.png') }}" alt="The Tavern" class="logo-img">
+    </a>
+    <nav>
+        <nav>
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('sessions_page') }}">Sessions</a>
+            <a href="{{ url_for('item_distribution_page')}}">Items</a>
+            <a href="{{ url_for('class_stats_page') }}">Class Stats</a>
+            <a href="{{ url_for('spell_distribution_page') }}">Spell Stats</a>
+        </nav>
+    </nav>
+</header>
+
+<main>
+
+<div class="title-box">
+    <h2>Tavern Westmarches Dashboard</h2>
+</div>
+
+<input type="text" id="search" placeholder="Search characters, players, spells...">
+<div id="search-results"></div>
+
+<div class="grid">
+
+    <div class="card">
+        <h3>Quick Stats</h3>
+        <p id="characters"></p>
+        <p id="players"></p>
+        <p id="classes"></p>
+    </div>
+
+    <div class="card">
+        <h3>Recent Sessions</h3>
+        <ul id="sessions"></ul>
+    </div>
+
+    <div class="card">
+        <h3>Class Distribution</h3>
+        <canvas id="classChart"></canvas>
+    </div>
+
+</div>
+
+</main>
+
+<script src="/static/main.js"></script>
+</body>
+</html>

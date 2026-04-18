@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="character-detail-page">
+
+    <section class="character-hero">
+        <div class="character-hero-left">
+            <img id="character-avatar" class="character-hero-avatar" src="/static/default-avatar.svg" alt="Character Avatar">
+        </div>
+
+        <div class="character-hero-right">
+            <h1 id="character-name">CHARACTER NAME</h1>
+            <div class="section-rule thick"></div>
+
+            <div id="character-subtitle" class="character-subtitle">Race Class (Subclass)</div>
+            <div id="character-meta-line" class="character-meta-line">Level | Tier | Active</div>
+            <div class="character-meta-line">
+                Player: <a id="character-player-link" class="player-link" href="#">Player</a>
+                <span id="character-sessions-played">| Sessions Played: 0</span>
+            </div>
+
+            <div class="character-link-row">
+                <a id="dnd-beyond-link" class="external-link" href="#" target="_blank" rel="noopener noreferrer">D&amp;D Beyond Link →</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="ability-section">
+        <div class="stat-panel">
+            <h2 class="section-title">ABILITY SCORES</h2>
+            <div class="ability-grid" id="ability-grid"></div>
+        </div>
+    </section>
+
+    <section class="core-stats-section">
+        <div class="core-stat-card">HP: <span id="character-hp">-</span></div>
+        <div class="core-stat-card">AC: <span id="character-ac">-</span></div>
+        <div class="core-stat-card">PP: <span id="character-pp">-</span></div>
+        <div class="core-stat-card">Gold: <span id="character-gold">-</span></div>
+    </section>
+
+    <section class="growth-section">
+        <h2 class="section-title">GROWTH OVER TIME</h2>
+        <div class="section-rule"></div>
+        <div class="chart-card character-growth-chart-card">
+            <canvas id="characterGrowthChart"></canvas>
+        </div>
+    </section>
+
+    <section class="inventory-spellbook-section">
+        <div class="split-panel">
+            <h2 class="section-title">INVENTORY <span id="inventory-count">(0 items)</span></h2>
+            <div class="section-rule"></div>
+            <div id="inventory-list" class="simple-list"></div>
+        </div>
+
+        <div class="split-panel">
+            <h2 class="section-title">SPELLBOOK <span id="spell-count"></span></h2>
+            <div class="section-rule"></div>
+            <div id="spell-list" class="simple-list"></div>
+        </div>
+    </section>
+
+    <section class="session-history-section">
+        <h2 class="section-title">SESSION HISTORY</h2>
+        <div class="section-rule"></div>
+
+        <div class="table-wrapper">
+            <table class="recent-sessions-table">
+                <thead>
+                    <tr>
+                        <th>Session</th>
+                        <th>Date</th>
+                        <th>DM</th>
+                        <th>Level Change</th>
+                        <th>Gold Change</th>
+                    </tr>
+                </thead>
+                <tbody id="character-session-history-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+<script>
+    const characterId = {{ character_id|tojson }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='character_detail.js') }}"></script>
+{% endblock %}
