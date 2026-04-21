@@ -34,18 +34,34 @@ load_dotenv()
 BASE_URL = "https://www.westmarches.games"
 
 
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+
+
 def setup_selenium() -> webdriver.Chrome:
     options = Options()
+
+    # Point Selenium to the browser binary inside the image
     options.binary_location = "/opt/chrome/chrome"
 
+    # Lambda-safe flags
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--single-process")
     options.add_argument("--window-size=1920,1080")
+    options.add_argument("--remote-debugging-port=9222")
 
+    # Force Chrome to use Lambda's writable temp space
+    options.add_argument("--user-data-dir=/tmp/chrome-user-data")
+    options.add_argument("--data-path=/tmp/chrome-data")
+    options.add_argument("--disk-cache-dir=/tmp/chrome-cache")
+
+    # Point Selenium to the chromedriver binary inside the image
     service = Service("/opt/chromedriver")
+
     return webdriver.Chrome(service=service, options=options)
 
 

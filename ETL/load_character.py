@@ -906,7 +906,7 @@ def run_load() -> None:
 
     try:
         data = extract()
-        conn = get_db_connection()
+        conn = get_db_connection("local")
 
         load_players(conn, data["players"])
         discord_map, player_name_map, dnd_map = get_players(conn)
