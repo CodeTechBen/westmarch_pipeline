@@ -2,22 +2,30 @@
 # pyright: reportUnknownMemberType=false
 # pyright: reportUnknownArgumentType=false
 
-'''Loads character data into the database.'''
+"""Loads character data into the database and supports AWS Lambda execution."""
+
+from __future__ import annotations
+
+from typing import Any, Optional
+
 from extract_characters import extract
 from setup import get_db_connection, setup_logging
 
-import psycopg2
 import logging
+import psycopg2
 
-def get_players(conn: psycopg2.extensions.connection) -> tuple[dict[str, int], dict[str, int], dict[str, int]]:
-    '''Returns lookup maps for players by different identifiers.'''
+
+def get_players(
+    conn: psycopg2.extensions.connection,
+) -> tuple[dict[str, int], dict[str, int], dict[str, int]]:
+    """Returns lookup maps for players by different identifiers."""
     with conn.cursor() as cur:
         cur.execute("SELECT player_id, discord_name, player_name, dnd_beyond_name FROM player")
         rows = cur.fetchall()
 
-    discord_map = {}
-    player_name_map = {}
-    dnd_map = {}
+    discord_map: dict[str, int] = {}
+    player_name_map: dict[str, int] = {}
+    dnd_map: dict[str, int] = {}
 
     for row in rows:
         player_id, discord_name, player_name, dnd_name = row
@@ -29,80 +37,86 @@ def get_players(conn: psycopg2.extensions.connection) -> tuple[dict[str, int], d
         if dnd_name:
             dnd_map[dnd_name] = player_id
 
-    logging.info(f"Loaded {len(rows)} players into lookup maps.")
-
+    logging.info("Loaded %s players into lookup maps.", len(rows))
     return discord_map, player_name_map, dnd_map
 
-def load_players(conn: psycopg2.extensions.connection, players):
+
+def load_players(conn: psycopg2.extensions.connection, players: list[dict[str, Any]]) -> None:
     """Loads player data into the database."""
     with conn.cursor() as cur:
         for player in players:
-            logging.info(f"Loading player: {player['player_name']}")
-            cur.execute("""
+            logging.info("Loading player: %s", player["player_name"])
+            cur.execute(
+                """
                 INSERT INTO player (player_name, discord_name, dnd_beyond_name)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (discord_name) DO UPDATE SET
                     player_name = EXCLUDED.player_name,
                     dnd_beyond_name = EXCLUDED.dnd_beyond_name
-            """, (
-                player["player_name"],
-                player["discord_name"],
-                player["dnd_beyond_name"]
-            ))
+                """,
+                (
+                    player.get("player_name"),
+                    player.get("discord_name"),
+                    player.get("dnd_beyond_name"),
+                ),
+            )
     conn.commit()
 
+
 def get_races(conn: psycopg2.extensions.connection) -> dict[str, int]:
-    '''Returns a lookup map for races by name.'''
+    """Returns a lookup map for races by name."""
     with conn.cursor() as cur:
         cur.execute("SELECT race_id, race_name FROM race")
         rows = cur.fetchall()
 
-    race_map = {name: id for id, name in rows}
-    logging.info(f"Loaded {len(rows)} races into lookup map.")
-
+    race_map = {name: race_id for race_id, name in rows}
+    logging.info("Loaded %s races into lookup map.", len(rows))
     return race_map
 
-def load_races(conn: psycopg2.extensions.connection, data: dict[str, list[dict[str, any]]]):
-    '''Loads race data into the database.'''
-    race_map = get_races(conn)
 
-    unique_races = dict[str, str]() # type: ignore
+def load_races(conn: psycopg2.extensions.connection, data: dict[str, list[dict[str, Any]]]) -> None:
+    """Loads race data into the database."""
+    unique_races: dict[str, Optional[str]] = {}
     characters = data.get("characters", [])
+
     for character in characters:
         race = character.get("race")
-        race_name = race.get("name") if race else None
-        race_description = race.get("description") if race else None
+        race_name = race.get("name") if isinstance(race, dict) else None
+        race_description = race.get("description") if isinstance(race, dict) else None
         if race_name and race_name not in unique_races:
             unique_races[race_name] = race_description
-        
+
     with conn.cursor() as cur:
         for race_name, race_description in unique_races.items():
-            logging.info(f"Loading race: {race_name}")
-            cur.execute("""
+            logging.info("Loading race: %s", race_name)
+            cur.execute(
+                """
                 INSERT INTO race (race_name, race_description)
                 VALUES (%s, %s)
                 ON CONFLICT (race_name) DO UPDATE SET
                     race_description = EXCLUDED.race_description
-            """, (race_name, race_description))
+                """,
+                (race_name, race_description),
+            )
     conn.commit()
 
+
 def get_classes(conn: psycopg2.extensions.connection) -> dict[str, int]:
-    '''Returns a lookup map for classes by name.'''
+    """Returns a lookup map for classes by name."""
     with conn.cursor() as cur:
         cur.execute("SELECT class_id, class_name FROM class")
         rows = cur.fetchall()
 
-    class_map = {name: id for id, name in rows}
-    logging.info(f"Loaded {len(rows)} classes into lookup map.")
-
+    class_map = {name: class_id for class_id, name in rows}
+    logging.info("Loaded %s classes into lookup map.", len(rows))
     return class_map
 
-def load_classes(conn: psycopg2.extensions.connection, data: dict[str, list[dict[str, any]]]):
-    '''Loads class data into the database.'''
-    class_map = get_classes(conn)
 
-    unique_classes = dict[str, str]() # type: ignore
+def load_classes(conn: psycopg2.extensions.connection, data: dict[str, list[dict[str, Any]]]) -> None:
+    """Loads class data into the database."""
+    unique_classes: dict[str, Optional[str]] = {}
     classes = data.get("classes", [])
+
     for class_info in classes:
         class_name = class_info.get("class_name")
         class_description = class_info.get("description")
@@ -111,30 +125,37 @@ def load_classes(conn: psycopg2.extensions.connection, data: dict[str, list[dict
 
     with conn.cursor() as cur:
         for class_name, class_description in unique_classes.items():
-            logging.info(f"Loading class: {class_name}")
-            cur.execute("""
+            logging.info("Loading class: %s", class_name)
+            cur.execute(
+                """
                 INSERT INTO class (class_name, class_description)
                 VALUES (%s, %s)
                 ON CONFLICT (class_name) DO UPDATE SET
                     class_description = EXCLUDED.class_description
-            """, (class_name, class_description))
+                """,
+                (class_name, class_description),
+            )
     conn.commit()
 
+
 def get_subclasses(conn: psycopg2.extensions.connection) -> dict[str, int]:
-    '''Returns a lookup map for subclasses by name.'''
+    """Returns a lookup map for subclasses by name."""
     with conn.cursor() as cur:
         cur.execute("SELECT subclass_id, subclass_name FROM subclass")
         rows = cur.fetchall()
 
-    subclass_map = {name: id for id, name in rows}
-    return subclass_map
+    return {name: subclass_id for subclass_id, name in rows}
 
-def load_subclasses(conn: psycopg2.extensions.connection, data: dict[str, list[dict[str, any]]], class_map: dict[str, int]):
-    '''Loads subclass data into the database.'''
-    subclass_map = get_subclasses(conn)
 
-    unique_subclasses = dict[str, dict[str, str]]() # type: ignore
+def load_subclasses(
+    conn: psycopg2.extensions.connection,
+    data: dict[str, list[dict[str, Any]]],
+    class_map: dict[str, int],
+) -> None:
+    """Loads subclass data into the database."""
+    unique_subclasses: dict[str, dict[str, Any]] = {}
     subclasses = data.get("subclasses", [])
+
     for subclass_info in subclasses:
         subclass_name = subclass_info.get("subclass_name")
         subclass_description = subclass_info.get("description")
@@ -143,35 +164,47 @@ def load_subclasses(conn: psycopg2.extensions.connection, data: dict[str, list[d
             unique_subclasses[subclass_name] = {
                 "description": subclass_description,
                 "class_name": class_name,
-                "class_id": class_map.get(class_name)
+                "class_id": class_map.get(class_name),
             }
 
     with conn.cursor() as cur:
         for subclass_name, subclass_info in unique_subclasses.items():
-            logging.info(f"Loading subclass: {subclass_name}")
-            cur.execute("""
+            logging.info("Loading subclass: %s", subclass_name)
+            cur.execute(
+                """
                 INSERT INTO subclass (subclass_name, subclass_description, class_id)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (subclass_name) DO UPDATE SET
                     subclass_description = EXCLUDED.subclass_description,
                     class_id = EXCLUDED.class_id
-            """, (subclass_name, subclass_info["description"], subclass_info["class_id"]))
+                """,
+                (
+                    subclass_name,
+                    subclass_info["description"],
+                    subclass_info["class_id"],
+                ),
+            )
     conn.commit()
 
+
 def get_sessions(conn: psycopg2.extensions.connection) -> dict[str, int]:
-    '''Returns a lookup map for sessions by name.'''
+    """Returns a lookup map for sessions by name."""
     with conn.cursor() as cur:
         cur.execute("SELECT session_id, session_name FROM session")
         rows = cur.fetchall()
 
-    session_map = {name: id for id, name in rows}
-    logging.info(f"Loaded {len(rows)} sessions into lookup map.")
-
+    session_map = {name: session_id for session_id, name in rows}
+    logging.info("Loaded %s sessions into lookup map.", len(rows))
     return session_map
 
-def find_existing_player(player: dict[str, str], discord_map: dict[str, int], player_name_map: dict[str, int], dnd_map: dict[str, int]) -> int:
-    '''Finds an existing player ID using priority matching.'''
 
+def find_existing_player(
+    player: dict[str, Optional[str]],
+    discord_map: dict[str, int],
+    player_name_map: dict[str, int],
+    dnd_map: dict[str, int],
+) -> Optional[int]:
+    """Finds an existing player ID using priority matching."""
     discord_name = player.get("discord_name")
     player_name = player.get("player_name") or player.get("name")
     dnd_name = player.get("dnd_beyond_name")
@@ -187,17 +220,17 @@ def find_existing_player(player: dict[str, str], discord_map: dict[str, int], pl
 
     return None
 
+
 def load_sessions(
     conn: psycopg2.extensions.connection,
-    data: dict[str, list[dict[str, any]]],
+    data: dict[str, list[dict[str, Any]]],
     discord_map: dict[str, int],
     player_name_map: dict[str, int],
-    dnd_map: dict[str, int]
-):
-    '''Loads session data into the database.'''
-
+    dnd_map: dict[str, int],
+) -> None:
+    """Loads session data into the database."""
     sessions = data.get("sessions", [])
-    unique_sessions: dict[str, dict[str, any]] = {}
+    unique_sessions: dict[str, dict[str, Any]] = {}
 
     for session in sessions:
         session_key = session.get("session_key")
@@ -207,69 +240,69 @@ def load_sessions(
         dm_player = {
             "discord_name": session.get("dm_player_key"),
             "player_name": session.get("dm_player_name"),
-            "dnd_beyond_name": None
+            "dnd_beyond_name": None,
         }
 
-        dm_id = find_existing_player(
-            dm_player,
-            discord_map,
-            player_name_map,
-            dnd_map
-        )
+        dm_id = find_existing_player(dm_player, discord_map, player_name_map, dnd_map)
 
         if not session_key:
-            logging.warning(f"Skipping session with no session_key: {session_name}")
+            logging.warning("Skipping session with no session_key: %s", session_name)
             continue
 
         unique_sessions[session_key] = {
             "session_name": session_name,
             "date": session_date,
-            "dm_id": dm_id
+            "dm_id": dm_id,
         }
 
     with conn.cursor() as cur:
         for session_key, session_data in unique_sessions.items():
-            logging.info(f"Loading session: {session_data['session_name']} ({session_key})")
+            logging.info(
+                "Loading session: %s (%s)",
+                session_data["session_name"],
+                session_key,
+            )
 
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO session (session_key, session_name, date, dm_player_id)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (session_name) DO UPDATE SET
                     session_key = EXCLUDED.session_key,
                     date = EXCLUDED.date,
                     dm_player_id = EXCLUDED.dm_player_id
-            """, (
-                session_key,
-                session_data["session_name"],
-                session_data["date"],
-                session_data["dm_id"]
-            ))
+                """,
+                (
+                    session_key,
+                    session_data["session_name"],
+                    session_data["date"],
+                    session_data["dm_id"],
+                ),
+            )
 
     conn.commit()
 
+
 def get_characters(conn: psycopg2.extensions.connection) -> dict[str, int]:
-    '''Returns a lookup map for characters by name.'''
+    """Returns a lookup map for characters by key."""
     with conn.cursor() as cur:
         cur.execute("SELECT character_id, character_key FROM character")
         rows = cur.fetchall()
 
-    character_map = {key: id for id, key in rows}
-    # logging.info(f"{character_map}")
-    logging.info(f"Loaded {len(rows)} characters into lookup map.")
-
+    character_map = {key: character_id for character_id, key in rows}
+    logging.info("Loaded %s characters into lookup map.", len(rows))
     return character_map
+
 
 def load_character(
     conn: psycopg2.extensions.connection,
-    characters: list[dict[str, any]],
+    characters: list[dict[str, Any]],
     discord_map: dict[str, int],
     player_name_map: dict[str, int],
-    dnd_map: dict[str, int]
-):
-    """Loads character data into the database, including characters without D&D Beyond data."""
-
+    dnd_map: dict[str, int],
+) -> None:
+    """Loads character data into the database."""
     race_map = get_races(conn)
-    character_lookup = get_characters(conn)
 
     with conn.cursor() as cur:
         for character in characters:
@@ -281,18 +314,13 @@ def load_character(
             player_obj = {
                 "discord_name": player_key,
                 "player_name": None,
-                "dnd_beyond_name": None
+                "dnd_beyond_name": None,
             }
 
-            player_id = find_existing_player(
-                player_obj,
-                discord_map,
-                player_name_map,
-                dnd_map
-            )
+            player_id = find_existing_player(player_obj, discord_map, player_name_map, dnd_map)
 
             if not player_id:
-                logging.warning(f"No player found for character {character_key}")
+                logging.warning("No player found for character %s", character_key)
                 continue
 
             race = character.get("race")
@@ -300,9 +328,10 @@ def load_character(
             race_id = race_map.get(race_name) if race_name else None
 
             if race_name and not race_id:
-                logging.warning(f"Race not found in DB: {race_name}")
+                logging.warning("Race not found in DB: %s", race_name)
 
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO character (
                     character_key,
                     character_name,
@@ -319,91 +348,82 @@ def load_character(
                     player_id = EXCLUDED.player_id,
                     race_id = EXCLUDED.race_id
                 RETURNING character_id
-            """, (
-                character.get("character_key"),
-                character.get("character_name"),
-                character.get("character_page_url"),
-                character.get("dnd_beyond_id"),
-                player_id,
-                race_id
-            ))
+                """,
+                (
+                    character.get("character_key"),
+                    character.get("character_name"),
+                    character.get("character_page_url"),
+                    character.get("dnd_beyond_id"),
+                    player_id,
+                    race_id,
+                ),
+            )
 
             character_id = cur.fetchone()[0]
-            character_lookup[character_key] = character_id
-
-            logging.info(f"Loaded character: {character.get('character_name')}")
+            logging.info("Loaded character: %s (%s)", character.get("character_name"), character_id)
 
     conn.commit()
     logging.info("Character data loaded successfully.")
 
+
 def attach_classes_to_characters(
-    characters: list[dict],
-    character_classes: list[dict]
-) -> list[dict]:
-    '''
-    Combines character data with their classes using character_key.
-    Returns characters with a "classes" field.
-    '''
-
-    character_map = {
-        c["character_key"]: c
-        for c in characters
-    }
-
-    class_map: dict[str, list[dict]] = {}
+    characters: list[dict[str, Any]],
+    character_classes: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Combines character data with their classes using character_key."""
+    character_map = {c["character_key"]: c for c in characters if c.get("character_key")}
+    class_map: dict[str, list[dict[str, Any]]] = {}
 
     for cls in character_classes:
         key = cls.get("character_key")
 
         if not key:
-            logging.warning(f"Missing character_key for class: {cls}")
+            logging.warning("Missing character_key for class: %s", cls)
             continue
 
         if key not in class_map:
             class_map[key] = []
 
-        class_map[key].append({
-            "class_name": cls.get("class_name"),
-            "subclass_name": cls.get("subclass_name"),
-            "level": cls.get("level")
-        })
+        class_map[key].append(
+            {
+                "class_name": cls.get("class_name"),
+                "subclass_name": cls.get("subclass_name"),
+                "level": cls.get("level"),
+            }
+        )
 
-    output = []
-
+    output: list[dict[str, Any]] = []
     for key, character in character_map.items():
         character_copy = character.copy()
-
         character_copy["classes"] = class_map.get(key, [])
-
         output.append(character_copy)
 
     return output
 
-def load_character_classes(
-    conn,
-    characters: list[dict[str, any]]
-):
-    '''Loads character_class data into the database.'''
 
+def load_character_classes(
+    conn: psycopg2.extensions.connection,
+    characters: list[dict[str, Any]],
+) -> None:
+    """Loads character_class data into the database."""
     character_map = get_characters(conn)
     class_map = get_classes(conn)
     subclass_map = get_subclasses(conn)
 
     with conn.cursor() as cur:
-
         for character in characters:
             character_key = character.get("character_key")
             character_name = character.get("character_name")
             classes = character.get("classes", [])
 
             if not character_key or not classes:
-                logging.warning(f"Missing character key or classes for character: {character}")
+                logging.warning("Missing character key or classes for character: %s", character)
                 continue
 
             character_id = character_map.get(character_key)
 
             if not character_id:
-                logging.warning(f"Character not found in DB: {character_name}")
+                logging.warning("Character not found in DB: %s", character_name)
                 continue
 
             for cls in classes:
@@ -415,10 +435,11 @@ def load_character_classes(
                 subclass_id = subclass_map.get(subclass_name) if subclass_name else None
 
                 if not class_id:
-                    logging.warning(f"Class not found: {class_name}")
+                    logging.warning("Class not found: %s", class_name)
                     continue
 
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO character_class (
                         character_id,
                         class_id,
@@ -430,65 +451,61 @@ def load_character_classes(
                     DO UPDATE SET
                         subclass_id = EXCLUDED.subclass_id,
                         level = EXCLUDED.level
-                """, (
-                    character_id,
-                    class_id,
-                    subclass_id,
-                    level
-                ))
+                    """,
+                    (
+                        character_id,
+                        class_id,
+                        subclass_id,
+                        level,
+                    ),
+                )
 
                 logging.info(
-                    f"Loaded class for {character_name}: {class_name} ({subclass_name}) lvl {level}"
+                    "Loaded class for %s: %s (%s) lvl %s",
+                    character_name,
+                    class_name,
+                    subclass_name,
+                    level,
                 )
 
     conn.commit()
     logging.info("Character classes loaded successfully.")
 
+
 def build_character_key_lookup(
-    characters: list[dict],
-    conn
+    characters: list[dict[str, Any]],
+    conn: psycopg2.extensions.connection,
 ) -> dict[str, int]:
-    '''
-    Maps character_key -> character_id using character_name as bridge.
-    '''
-
+    """Maps character_key -> character_id."""
     db_character_map = get_characters(conn)
-
-    lookup = {}
+    lookup: dict[str, int] = {}
 
     for c in characters:
         key = c.get("character_key")
-        logging.info(f"Processing character for lookup: {key}")
         name = c.get("character_name")
-        logging.info(f"Character name for lookup: {name}")
 
         if not key or not name:
-            logging.warning(f"Missing key or name for character: {c}")
+            logging.warning("Missing key or name for character: %s", c)
             continue
 
         character_id = db_character_map.get(key)
 
         if not character_id:
-            logging.warning(f"Character not found in DB for key {key}: {name}")
+            logging.warning("Character not found in DB for key %s: %s", key, name)
             continue
 
         lookup[key] = character_id
-        logging.info(f"Character key lookup added: {key} -> {character_id}")
 
     return lookup
 
+
 def build_session_key_lookup(
-    sessions: list[dict],
-    conn
+    sessions: list[dict[str, Any]],
+    conn: psycopg2.extensions.connection,
 ) -> dict[str, int]:
-    '''
-    Maps session_key -> session_id using session_name as bridge.
-    '''
-
-    # DB: session_name -> id
+    """Maps session_key -> session_id."""
     db_session_map = get_sessions(conn)
-
-    lookup = {}
+    lookup: dict[str, int] = {}
 
     for s in sessions:
         key = s.get("session_key")
@@ -500,43 +517,42 @@ def build_session_key_lookup(
         session_id = db_session_map.get(name)
 
         if not session_id:
-            logging.warning(f"Session not found in DB for key {key}: {name}")
+            logging.warning("Session not found in DB for key %s: %s", key, name)
             continue
 
         lookup[key] = session_id
 
     return lookup
 
-def load_character_growth(
-    conn,
-    characters: list[dict],
-    sessions: list[dict],
-    character_growth: list[dict]
-):
-    """Loads character growth data into the database."""
 
+def load_character_growth(
+    conn: psycopg2.extensions.connection,
+    characters: list[dict[str, Any]],
+    sessions: list[dict[str, Any]],
+    character_growth: list[dict[str, Any]],
+) -> None:
+    """Loads character growth data into the database."""
     character_lookup = build_character_key_lookup(characters, conn)
     session_lookup = build_session_key_lookup(sessions, conn)
 
     with conn.cursor() as cur:
-
         for growth in character_growth:
-
             character_key = growth.get("character_key")
             session_key = growth.get("session_key")
 
             character_id = character_lookup.get(character_key)
-            session_id = session_lookup.get(session_key)
+            session_id = session_lookup.get(session_key) if session_key else None
 
             if character_id is None:
-                logging.warning(f"Missing character_id for key: {character_key}")
+                logging.warning("Missing character_id for key: %s", character_key)
                 continue
 
             if session_key and session_id is None:
-                logging.warning(f"Missing session_id for key: {session_key}")
+                logging.warning("Missing session_id for key: %s", session_key)
                 continue
 
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO character_growth (
                     character_id,
                     session_id,
@@ -567,74 +583,100 @@ def load_character_growth(
                     passive_perception = EXCLUDED.passive_perception,
                     armor_class = EXCLUDED.armor_class,
                     time = CURRENT_TIMESTAMP
-            """, (
-                character_id,
-                session_id,
-                growth.get("level"),
-                growth.get("strength"),
-                growth.get("dexterity"),
-                growth.get("constitution"),
-                growth.get("intelligence"),
-                growth.get("wisdom"),
-                growth.get("charisma"),
-                growth.get("hit_points"),
-                growth.get("gold", 0),
-                growth.get("passive_perception"),
-                growth.get("armor_class")
-            ))
+                """,
+                (
+                    character_id,
+                    session_id,
+                    growth.get("level"),
+                    growth.get("strength"),
+                    growth.get("dexterity"),
+                    growth.get("constitution"),
+                    growth.get("intelligence"),
+                    growth.get("wisdom"),
+                    growth.get("charisma"),
+                    growth.get("hit_points"),
+                    growth.get("gold", 0),
+                    growth.get("passive_perception"),
+                    growth.get("armor_class"),
+                ),
+            )
 
     conn.commit()
     logging.info("Character growths loaded successfully.")
 
-def get_tags(conn):
-    '''Returns a lookup map for tags by name.'''
+
+def get_tags(conn: psycopg2.extensions.connection) -> dict[str, int]:
+    """Returns a lookup map for tags by name."""
     with conn.cursor() as cur:
         cur.execute("SELECT tag_id, tag_name FROM tag")
         rows = cur.fetchall()
 
-    tag_map = {name: id for id, name in rows}
-    logging.info(f"Loaded {len(rows)} tags into lookup map.")
-
+    tag_map = {name: tag_id for tag_id, name in rows}
+    logging.info("Loaded %s tags into lookup map.", len(rows))
     return tag_map
 
-def load_tags(conn, spells, items):
-    '''Loads tags for spells and items into the database.'''
-    tags = set()
+
+def load_tags(
+    conn: psycopg2.extensions.connection,
+    spells: Optional[list[dict[str, Any]]],
+    items: Optional[list[dict[str, Any]]],
+) -> None:
+    """Loads tags for spells and items into the database."""
+    tags: set[str] = set()
+
     for spell in spells or []:
         for tag in spell.get("tags", []):
             tags.add(tag)
+
     for item in items or []:
         for tag in item.get("tags", []):
             tags.add(tag)
 
     with conn.cursor() as cur:
         for tag in tags:
-            logging.info(f"Loading tag: {tag}")
-            cur.execute("""
+            logging.info("Loading tag: %s", tag)
+            cur.execute(
+                """
                 INSERT INTO tag (tag_name)
                 VALUES (%s)
                 ON CONFLICT (tag_name) DO NOTHING
-            """, (tag,))
+                """,
+                (tag,),
+            )
+
     conn.commit()
     logging.info("Tags loaded successfully.")
 
-def load_spells(conn, spells, tag_map):
-    '''Loads spell data into the database.'''
+
+def load_spells(
+    conn: psycopg2.extensions.connection,
+    spells: Optional[list[dict[str, Any]]],
+    tag_map: dict[str, int],
+) -> None:
+    """Loads spell data into the database."""
     with conn.cursor() as cur:
         for spell in spells or []:
-            logging.info(f"Loading spell: {spell.get('spell_name')}")
-            range = spell.get("range")
-            if range.get("origin") == "self":
+            logging.info("Loading spell: %s", spell.get("spell_name"))
+
+            spell_range = spell.get("range") or {}
+            if isinstance(spell_range, dict) and spell_range.get("origin") == "self":
                 range_value = "Self"
             else:
-                range_value = range.get("rangeValue", "")
-            
-            duration = spell.get("duration")
-            duration_value = " ".join([
-                str(duration.get("durationInterval") or ""),
-                str(duration.get("durationUnit") or "")
-            ]) if duration else ""
-            cur.execute("""
+                range_value = spell_range.get("rangeValue", "") if isinstance(spell_range, dict) else ""
+
+            duration = spell.get("duration") or {}
+            if isinstance(duration, dict):
+                duration_value = " ".join(
+                    [
+                        str(duration.get("durationInterval") or ""),
+                        str(duration.get("durationUnit") or ""),
+                    ]
+                ).strip()
+            else:
+                duration_value = ""
+
+            cur.execute(
+                """
                 INSERT INTO spell (
                     spell_name,
                     description,
@@ -662,44 +704,54 @@ def load_spells(conn, spells, tag_map):
                     duration = EXCLUDED.duration,
                     is_concentration = EXCLUDED.is_concentration,
                     is_ritual = EXCLUDED.is_ritual
-            """, (
-                spell.get("spell_name"),
-                spell.get("description"),
-                spell.get("level"),
-                spell.get("school"),
-                spell.get("casting_time"),
-                range_value,
-                spell.get("damage"),
-                spell.get("consumes_material", False),
-                spell.get("material_components"),
-                duration_value,
-                spell.get("is_concentration", False),
-                spell.get("is_ritual", False)
-            ))
+                """,
+                (
+                    spell.get("spell_name"),
+                    spell.get("description"),
+                    spell.get("level"),
+                    spell.get("school"),
+                    spell.get("casting_time"),
+                    range_value,
+                    spell.get("damage"),
+                    spell.get("consumes_material", False),
+                    spell.get("material_components"),
+                    duration_value,
+                    spell.get("is_concentration", False),
+                    spell.get("is_ritual", False),
+                ),
+            )
 
-            cur.execute("""
-                SELECT spell_id FROM spell WHERE spell_name = %s
-            """, (spell.get("spell_name"),))
+            cur.execute("SELECT spell_id FROM spell WHERE spell_name = %s", (spell.get("spell_name"),))
             spell_id = cur.fetchone()[0]
 
             for tag in spell.get("tags", []):
                 tag_id = tag_map.get(tag)
                 if tag_id:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         INSERT INTO spell_tag (spell_id, tag_id)
                         VALUES (%s, %s)
                         ON CONFLICT DO NOTHING
-                    """, (spell_id, tag_id))
+                        """,
+                        (spell_id, tag_id),
+                    )
 
     conn.commit()
     logging.info("Spells loaded successfully.")
 
-def load_items(conn, items, tag_map):
-    '''Loads item data into the database.'''
+
+def load_items(
+    conn: psycopg2.extensions.connection,
+    items: Optional[list[dict[str, Any]]],
+    tag_map: dict[str, int],
+) -> None:
+    """Loads item data into the database."""
     with conn.cursor() as cur:
         for item in items or []:
-            logging.info(f"Loading item: {item.get('item_name')}")
-            cur.execute("""
+            logging.info("Loading item: %s", item.get("item_name"))
+
+            cur.execute(
+                """
                 INSERT INTO item (
                     item_name,
                     type,
@@ -711,53 +763,60 @@ def load_items(conn, items, tag_map):
                     type = EXCLUDED.type,
                     rarity = EXCLUDED.rarity,
                     is_magical = EXCLUDED.is_magical
-            """, (
-                item.get("item_name"),
-                item.get("type"),
-                item.get("rarity"),
-                item.get("is_magical", False)
-            ))
+                """,
+                (
+                    item.get("item_name"),
+                    item.get("type"),
+                    item.get("rarity"),
+                    item.get("is_magical", False),
+                ),
+            )
 
-            cur.execute("""
-                SELECT item_id FROM item WHERE item_name = %s
-            """, (item.get("item_name"),))
-            item_id = cur.fetchone()[0]
-
-            for tag in item.get("tags", []):
-                item.get("weight"),
-                item.get("cost")
-            
-
-            cur.execute("""
-                SELECT item_id FROM item WHERE item_name = %s
-            """, (item.get("item_name"),))
+            cur.execute("SELECT item_id FROM item WHERE item_name = %s", (item.get("item_name"),))
             item_id = cur.fetchone()[0]
 
             for tag in item.get("tags", []):
                 tag_id = tag_map.get(tag)
                 if tag_id:
-                    cur.execute("""
+                    cur.execute(
+                        """
                         INSERT INTO item_tag (item_id, tag_id)
                         VALUES (%s, %s)
                         ON CONFLICT DO NOTHING
-                    """, (item_id, tag_id))
+                        """,
+                        (item_id, tag_id),
+                    )
 
     conn.commit()
+    logging.info("Items loaded successfully.")
 
-def get_character_last_growth_id(character_id, conn):
-    '''Returns the most recent character_growth_id for a character.'''
+
+def get_character_last_growth_id(
+    character_id: int,
+    conn: psycopg2.extensions.connection,
+) -> Optional[int]:
+    """Returns the most recent growth_id for a character."""
     with conn.cursor() as cur:
-        cur.execute("""
-            SELECT growth_id FROM character_growth
+        cur.execute(
+            """
+            SELECT growth_id
+            FROM character_growth
             WHERE character_id = %s
             ORDER BY time DESC
             LIMIT 1
-        """, (character_id,))
+            """,
+            (character_id,),
+        )
         result = cur.fetchone()
         return result[0] if result else None
 
-def load_inventory(conn, inventory, character_map):
-    '''Loads inventory data into the database.'''
+
+def load_inventory(
+    conn: psycopg2.extensions.connection,
+    inventory: list[dict[str, Any]],
+    character_map: dict[str, int],
+) -> None:
+    """Loads inventory data into the database."""
     with conn.cursor() as cur:
         for entry in inventory:
             character_key = entry.get("character_key")
@@ -765,103 +824,146 @@ def load_inventory(conn, inventory, character_map):
             quantity = entry.get("quantity", 1)
 
             character_id = character_map.get(character_key)
-            growth_id = get_character_last_growth_id(character_id, conn)
             if not character_id:
-                logging.warning(f"Character not found for inventory entry: {character_key}")
+                logging.warning("Character not found for inventory entry: %s", character_key)
                 continue
 
-            cur.execute("""
-                SELECT item_id FROM item WHERE item_name = %s
-            """, (item_name,))
+            growth_id = get_character_last_growth_id(character_id, conn)
+            if not growth_id:
+                logging.warning("No growth record found for character: %s", character_key)
+                continue
+
+            cur.execute("SELECT item_id FROM item WHERE item_name = %s", (item_name,))
             result = cur.fetchone()
 
             if not result:
-                logging.warning(f"Item not found for inventory entry: {item_name}")
+                logging.warning("Item not found for inventory entry: %s", item_name)
                 continue
 
             item_id = result[0]
-            logging.info(f"Loading inventory for character {character_key}: {item_name} x{quantity}")
-            cur.execute("""
+            logging.info("Loading inventory for character %s: %s x%s", character_key, item_name, quantity)
+            cur.execute(
+                """
                 INSERT INTO inventory (growth_id, character_id, item_id, quantity)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (growth_id, item_id, character_id) DO UPDATE SET
                     quantity = EXCLUDED.quantity
-            """, (growth_id, character_id, item_id, quantity))
+                """,
+                (growth_id, character_id, item_id, quantity),
+            )
+
     conn.commit()
 
-def load_spellbook(conn, spellbook, character_map):
-    '''Loads spellbook data into the database.'''
-    
+
+def load_spellbook(
+    conn: psycopg2.extensions.connection,
+    spellbook: list[dict[str, Any]],
+    character_map: dict[str, int],
+) -> None:
+    """Loads spellbook data into the database."""
     with conn.cursor() as cur:
         for entry in spellbook:
             character_key = entry.get("character_key")
             spell_name = entry.get("spell_name")
 
             character_id = character_map.get(character_key)
-            growth_id = get_character_last_growth_id(character_id, conn)
             if not character_id:
-                logging.warning(f"Character not found for spellbook entry: {character_key}")
+                logging.warning("Character not found for spellbook entry: %s", character_key)
                 continue
 
-            cur.execute("""
-                SELECT spell_id FROM spell WHERE spell_name = %s
-            """, (spell_name,))
+            growth_id = get_character_last_growth_id(character_id, conn)
+            if not growth_id:
+                logging.warning("No growth record found for character: %s", character_key)
+                continue
+
+            cur.execute("SELECT spell_id FROM spell WHERE spell_name = %s", (spell_name,))
             result = cur.fetchone()
 
             if not result:
-                logging.warning(f"Spell not found for spellbook entry: {spell_name}")
+                logging.warning("Spell not found for spellbook entry: %s", spell_name)
                 continue
 
             spell_id = result[0]
-            logging.info(f"Loading spellbook for character {character_id}: {spell_name}")
-            cur.execute("""
+            logging.info("Loading spellbook for character %s: %s", character_id, spell_name)
+            cur.execute(
+                """
                 INSERT INTO spellbook (growth_id, character_id, spell_id)
                 VALUES (%s, %s, %s)
                 ON CONFLICT DO NOTHING
-            """, (growth_id, character_id, spell_id))
+                """,
+                (growth_id, character_id, spell_id),
+            )
+
     conn.commit()
-def load():
+
+
+def run_load() -> None:
+    """Main ETL execution."""
     setup_logging()
+    logging.info("Starting character load job.")
 
-    data = extract()
+    conn: Optional[psycopg2.extensions.connection] = None
 
-    conn = get_db_connection()
+    try:
+        data = extract()
+        conn = get_db_connection()
 
-    load_players(conn, data["players"])
-    discord_map, player_name_map, dnd_map = get_players(conn)
+        load_players(conn, data["players"])
+        discord_map, player_name_map, dnd_map = get_players(conn)
 
-    load_races(conn, data)
-    load_classes(conn, data)
-    class_map = get_classes(conn)
-    load_subclasses(conn, data, class_map)
+        load_races(conn, data)
+        load_classes(conn, data)
+        class_map = get_classes(conn)
+        load_subclasses(conn, data, class_map)
 
-    load_sessions(conn, data, discord_map, player_name_map, dnd_map)
+        load_sessions(conn, data, discord_map, player_name_map, dnd_map)
 
-    load_character(conn, data["characters"], discord_map, player_name_map, dnd_map)
-    characters_with_classes = attach_classes_to_characters(
-    data["characters"],
-    data["character_class"]
-    )
+        load_character(conn, data["characters"], discord_map, player_name_map, dnd_map)
 
-    load_character_classes(conn, characters_with_classes)
+        characters_with_classes = attach_classes_to_characters(
+            data["characters"],
+            data["character_class"],
+        )
+        load_character_classes(conn, characters_with_classes)
+
+        load_character_growth(
+            conn,
+            data["characters"],
+            data["sessions"],
+            data["character_growth"],
+        )
+
+        load_tags(conn, data.get("spells"), data.get("items"))
+        tag_map = get_tags(conn)
+
+        load_spells(conn, data.get("spells"), tag_map)
+        load_items(conn, data.get("items"), tag_map)
+
+        character_lookup = build_character_key_lookup(data["characters"], conn)
+        load_inventory(conn, data.get("inventory", []), character_lookup)
+        load_spellbook(conn, data.get("spellbook", []), character_lookup)
+
+        logging.info("Character load job completed successfully.")
+
+    except Exception:
+        logging.exception("Character load job failed.")
+        if conn is not None:
+            conn.rollback()
+        raise
+    finally:
+        if conn is not None:
+            conn.close()
+            logging.info("Database connection closed.")
 
 
-    load_character_growth(
-        conn,
-        data["characters"],
-        data["sessions"],
-        data["character_growth"]
-    )
-
-    load_tags(conn, data.get('spells'), data.get('items'))
-    load_spells(conn, data.get('spells'), get_tags(conn))
-    load_items(conn, data.get('items'), get_tags(conn))
-    load_inventory(conn, data.get('inventory', []), build_character_key_lookup(data["characters"], conn))
-    load_spellbook(conn, data.get('spellbook', []), build_character_key_lookup(data["characters"], conn))
-    conn.close()
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
+    """AWS Lambda entrypoint."""
+    run_load()
+    return {
+        "statusCode": 200,
+        "body": "Character load completed successfully",
+    }
 
 
 if __name__ == "__main__":
-    load()
-
-    
+    run_load()
