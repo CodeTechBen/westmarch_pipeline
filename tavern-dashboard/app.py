@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, request
 from db import get_connection
+from collections import defaultdict
 
 app = Flask(__name__)
 
@@ -1912,7 +1913,8 @@ def spell_distribution_page():
 @app.route("/api/spell-distribution")
 def spell_distribution_api():
     tier = request.args.get("tier", "all").strip().lower()
-    class_filter = request.args.get("class", "all").strip()
+    class_filters = request.args.getlist("class")
+    species_filters = request.args.getlist("species")
     school_filter = request.args.get("school", "all").strip()
     level_filter = request.args.get("level", "any").strip().lower()
     tag_filter = request.args.get("tag", "").strip()
@@ -2308,6 +2310,417 @@ def spell_distribution_api():
         }
     })
 
+
+@app.route("/species-breakdown")
+def species_breakdown_page():
+    return render_template("species_breakdown.html")
+
+
+@app.route("/api/species-breakdown")
+def species_breakdown_api():
+    tier = request.args.get("tier", "all").strip().lower()
+    active_only = request.args.get("active_only", "true").lower() == "true"
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+
+    selected_species = [s.strip() for s in request.args.getlist("species") if s.strip()]
+    selected_classes = [c.strip() for c in request.args.getlist("class") if c.strip()]
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    filters = []
+    params = []
+
+    if active_only:
+        filters.append("c.is_active = TRUE")
+
+    if tier != "all":
+        filters.append("""
+            (
+                CASE
+                    WHEN COALESCE(lg.level, c.starting_level) BETWEEN 0 AND 4 THEN 1
+                    WHEN COALESCE(lg.level, c.starting_level) BETWEEN 5 AND 10 THEN 2
+                    WHEN COALESCE(lg.level, c.starting_level) BETWEEN 11 AND 15 THEN 3
+                    ELSE 4
+                END
+            ) = %s
+        """)
+        params.append(int(tier))
+
+    if selected_species:
+        filters.append("r.race_name = ANY(%s)")
+        params.append(selected_species)
+
+    if selected_classes:
+        filters.append("""
+            EXISTS (
+                SELECT 1
+                FROM character_class ccx
+                JOIN class clx
+                    ON ccx.class_id = clx.class_id
+                WHERE ccx.character_id = c.character_id
+                  AND clx.class_name = ANY(%s)
+            )
+        """)
+        params.append(selected_classes)
+
+    if date_from:
+        filters.append("(lg.session_date IS NULL OR lg.session_date >= %s)")
+        params.append(date_from)
+
+    if date_to:
+        filters.append("(lg.session_date IS NULL OR lg.session_date <= %s)")
+        params.append(date_to)
+
+    where_sql = ""
+    if filters:
+        where_sql = "WHERE " + " AND ".join(filters)
+
+    base_cte = f"""
+        WITH latest_growth AS (
+            SELECT DISTINCT ON (cg.character_id)
+                cg.character_id,
+                cg.level,
+                cg.hit_points,
+                cg.armor_class,
+                cg.passive_perception,
+                cg.strength,
+                cg.dexterity,
+                cg.constitution,
+                cg.intelligence,
+                cg.wisdom,
+                cg.charisma,
+                cg.gold,
+                s.date AS session_date,
+                cg.time
+            FROM character_growth cg
+            LEFT JOIN session s
+                ON cg.session_id = s.session_id
+            ORDER BY cg.character_id, cg.time DESC
+        ),
+        filtered_characters AS (
+            SELECT
+                c.character_id,
+                c.character_name,
+                c.picture_url,
+                c.player_id,
+                p.player_name,
+                r.race_name AS species_name,
+                COALESCE(lg.level, c.starting_level) AS level,
+                COALESCE(lg.hit_points, 0) AS hit_points,
+                COALESCE(lg.armor_class, 0) AS armor_class,
+                COALESCE(lg.passive_perception, 0) AS passive_perception,
+                COALESCE(lg.strength, 0) AS strength,
+                COALESCE(lg.dexterity, 0) AS dexterity,
+                COALESCE(lg.constitution, 0) AS constitution,
+                COALESCE(lg.intelligence, 0) AS intelligence,
+                COALESCE(lg.wisdom, 0) AS wisdom,
+                COALESCE(lg.charisma, 0) AS charisma,
+                COALESCE(lg.gold, 0) AS gold,
+                c.is_active
+            FROM character c
+            JOIN player p
+                ON c.player_id = p.player_id
+            JOIN race r
+                ON c.race_id = r.race_id
+            LEFT JOIN latest_growth lg
+                ON c.character_id = lg.character_id
+            {where_sql}
+        )
+    """
+
+    # available species
+    cur.execute("SELECT race_name FROM race ORDER BY race_name")
+    available_species = [row[0] for row in cur.fetchall()]
+
+    # available classes
+    cur.execute("SELECT class_name FROM class ORDER BY class_name")
+    available_classes = [row[0] for row in cur.fetchall()]
+
+    # quick stats + population
+    cur.execute(f"""
+        {base_cte}
+        SELECT
+            species_name,
+            COUNT(*) AS species_count
+        FROM filtered_characters
+        GROUP BY species_name
+        ORDER BY species_count DESC, species_name
+    """, params)
+
+    species_population_rows = cur.fetchall()
+
+    species_population = [
+        {"species_name": row[0], "count": row[1]}
+        for row in species_population_rows
+    ]
+
+    species_count = len(species_population)
+    most_common = species_population[0] if species_population else None
+
+    least_common = None
+    if species_population:
+        min_count = min(row["count"] for row in species_population if row["count"] > 0)
+        tied = [row["species_name"] for row in species_population if row["count"] == min_count]
+        least_common = {
+            "species_names": tied,
+            "count": min_count
+        }
+
+    # heatmap
+    cur.execute(f"""
+        {base_cte},
+        class_rows AS (
+            SELECT
+                fc.species_name,
+                cl.class_name,
+                COUNT(DISTINCT fc.character_id) AS combo_count
+            FROM filtered_characters fc
+            JOIN character_class cc
+                ON fc.character_id = cc.character_id
+            JOIN class cl
+                ON cc.class_id = cl.class_id
+            GROUP BY fc.species_name, cl.class_name
+        )
+        SELECT
+            species_name,
+            class_name,
+            combo_count
+        FROM class_rows
+        ORDER BY species_name, class_name
+    """, params)
+
+    heatmap_rows = cur.fetchall()
+
+    heatmap_species = sorted({row[0] for row in heatmap_rows})
+    heatmap_classes = sorted({row[1] for row in heatmap_rows})
+
+    heatmap_map = {
+        species: {cls: 0 for cls in heatmap_classes}
+        for species in heatmap_species
+    }
+
+    for species_name, class_name, combo_count in heatmap_rows:
+        heatmap_map[species_name][class_name] = combo_count
+
+    heatmap_values = [
+        [heatmap_map[species][cls] for cls in heatmap_classes]
+        for species in heatmap_species
+    ]
+
+    # tier distribution
+    cur.execute(f"""
+        {base_cte}
+        SELECT
+            species_name,
+            CASE
+                WHEN level BETWEEN 0 AND 4 THEN 1
+                WHEN level BETWEEN 5 AND 10 THEN 2
+                WHEN level BETWEEN 11 AND 15 THEN 3
+                ELSE 4
+            END AS tier_bucket,
+            COUNT(*) AS tier_count
+        FROM filtered_characters
+        GROUP BY species_name, tier_bucket
+        ORDER BY species_name, tier_bucket
+    """, params)
+
+    tier_rows = cur.fetchall()
+
+    tier_species = sorted({row[0] for row in tier_rows})
+    tier_map = {
+        species: {1: 0, 2: 0, 3: 0, 4: 0}
+        for species in tier_species
+    }
+
+    for species_name, tier_bucket, tier_count in tier_rows:
+        tier_map[species_name][tier_bucket] = tier_count
+
+    tier_distribution = {
+        "labels": tier_species,
+        "datasets": [
+            {"label": "Tier 1", "values": [tier_map[species][1] for species in tier_species]},
+            {"label": "Tier 2", "values": [tier_map[species][2] for species in tier_species]},
+            {"label": "Tier 3", "values": [tier_map[species][3] for species in tier_species]},
+            {"label": "Tier 4", "values": [tier_map[species][4] for species in tier_species]}
+        ]
+    }
+
+    # character grid
+    cur.execute(f"""
+        {base_cte},
+        class_agg AS (
+            SELECT
+                character_id,
+                STRING_AGG(class_display, ' / ' ORDER BY class_name) AS class_display,
+                ARRAY_AGG(class_name ORDER BY class_name) AS class_names
+            FROM (
+                SELECT DISTINCT
+                    cc.character_id,
+                    cl.class_name,
+                    cl.class_name || COALESCE(' (' || sc.subclass_name || ')', '') AS class_display
+                FROM character_class cc
+                JOIN class cl
+                    ON cc.class_id = cl.class_id
+                LEFT JOIN subclass sc
+                    ON cc.subclass_id = sc.subclass_id
+            ) class_distinct
+            GROUP BY character_id
+        )
+        SELECT
+            fc.character_id,
+            fc.character_name,
+            fc.picture_url,
+            fc.player_id,
+            fc.player_name,
+            fc.species_name,
+            fc.level,
+            fc.hit_points,
+            fc.armor_class,
+            fc.passive_perception,
+            fc.strength,
+            fc.dexterity,
+            fc.constitution,
+            fc.intelligence,
+            fc.wisdom,
+            fc.charisma,
+            ca.class_display,
+            ca.class_names
+        FROM filtered_characters fc
+        LEFT JOIN class_agg ca
+            ON fc.character_id = ca.character_id
+        ORDER BY fc.species_name, fc.character_name
+    """, params)
+
+    character_rows = cur.fetchall()
+
+    characters = []
+    for row in character_rows:
+        characters.append({
+            "character_id": row[0],
+            "character_name": row[1],
+            "avatar": row[2],
+            "player_id": row[3],
+            "player_name": row[4],
+            "species_name": row[5],
+            "level": row[6],
+            "hit_points": row[7],
+            "armor_class": row[8],
+            "passive_perception": row[9],
+            "strength": row[10],
+            "dexterity": row[11],
+            "constitution": row[12],
+            "intelligence": row[13],
+            "wisdom": row[14],
+            "charisma": row[15],
+            "class_display": row[16] or "Unknown",
+            "class_names": row[17] or []
+        })
+
+    insights = build_species_insights(
+        species_population=species_population,
+        heatmap_rows=heatmap_rows,
+        tier_map=tier_map,
+        active_only=active_only
+    )
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "filters": {
+            "tier": tier,
+            "classes": selected_classes,
+            "species": selected_species,
+            "active_only": active_only,
+            "date_from": date_from,
+            "date_to": date_to,
+            "available_classes": available_classes,
+            "available_species": available_species
+        },
+        "quick_stats": {
+            "species_count": species_count,
+            "most_common": most_common,
+            "least_common": least_common
+        },
+        "species_population": species_population,
+        "species_class_heatmap": {
+            "species": heatmap_species,
+            "classes": heatmap_classes,
+            "values": heatmap_values
+        },
+        "tier_distribution": tier_distribution,
+        "characters": characters,
+        "insights": insights
+    })
+
+
+def build_species_insights(species_population, heatmap_rows, tier_map, active_only):
+    insights = []
+
+    if species_population:
+        most_common = species_population[0]
+        insights.append(
+            f"{most_common['species_name']} is the most represented species in the current filtered view ({most_common['count']})."
+        )
+
+        min_count = min(row["count"] for row in species_population if row["count"] > 0)
+        least_common_species = [row["species_name"] for row in species_population if row["count"] == min_count]
+        if least_common_species:
+            label = ", ".join(least_common_species)
+            suffix = "active species" if active_only else "species"
+            insights.append(
+                f"{label} {'is' if len(least_common_species) == 1 else 'are'} currently the least represented {suffix} ({min_count})."
+            )
+
+    widest_species = None
+    widest_tier_count = -1
+    widest_total = -1
+
+    for species_name, tier_counts in tier_map.items():
+        non_zero_tiers = sum(1 for count in tier_counts.values() if count > 0)
+        total = sum(tier_counts.values())
+        if non_zero_tiers > widest_tier_count or (non_zero_tiers == widest_tier_count and total > widest_total):
+            widest_species = species_name
+            widest_tier_count = non_zero_tiers
+            widest_total = total
+
+    if widest_species and widest_tier_count > 0:
+        insights.append(
+            f"{widest_species} is represented across {widest_tier_count} tier{'s' if widest_tier_count != 1 else ''} in the current filtered set."
+        )
+
+    species_class_counts = defaultdict(lambda: defaultdict(int))
+    for species_name, class_name, combo_count in heatmap_rows:
+        species_class_counts[species_name][class_name] = combo_count
+
+    association_lines = []
+    for species_name, class_counts in species_class_counts.items():
+        total = sum(class_counts.values())
+        if total < 3:
+            continue
+
+        sorted_classes = sorted(class_counts.items(), key=lambda x: x[1], reverse=True)
+        top_class, top_count = sorted_classes[0]
+        top_share = top_count / total
+
+        if top_share >= 0.5:
+            association_lines.append(
+                f"{species_name} appears most often in {top_class} builds."
+            )
+            continue
+
+        if len(sorted_classes) > 1:
+            second_class, second_count = sorted_classes[1]
+            if (top_count + second_count) / total >= 0.7:
+                association_lines.append(
+                    f"{species_name} is mostly represented in {top_class} and {second_class} combinations."
+                )
+
+    insights.extend(association_lines[:2])
+
+    return insights[:5]
 
 if __name__ == "__main__":
     app.run(debug=True)

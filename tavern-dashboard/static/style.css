@@ -24,7 +24,7 @@ nav a {
 }
 
 .logo-img {
-    height: 48px; /* adjust as needed */
+    height: 48px;
     width: auto;
     display: block;
 }
@@ -160,9 +160,6 @@ input {
     background-color: #e8f5e9;
 }
 
-/* =========================
-   SESSION DETAIL PAGE
-========================= */
 
 .session-detail-page {
     max-width: 1100px;
@@ -171,7 +168,6 @@ input {
     background-color: #f4f4f4;
 }
 
-/* Back link */
 .back-link {
     display: inline-block;
     margin-bottom: 20px;
@@ -184,7 +180,6 @@ input {
     text-decoration: underline;
 }
 
-/* Header */
 .session-header-card h1 {
     margin: 0;
     font-size: 28px;
@@ -198,7 +193,6 @@ input {
     align-items: center;
 }
 
-/* Section titles */
 .section-title {
     font-weight: bold;
     margin-top: 30px;
@@ -219,10 +213,6 @@ input {
     border-top: 4px solid #2e7d32;
 }
 
-/* =========================
-   CHARACTER CARDS
-========================= */
-
 .character-roster {
     display: flex;
     flex-direction: column;
@@ -237,7 +227,6 @@ input {
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-/* Card header */
 .card-header {
     display: flex;
     gap: 15px;
@@ -262,13 +251,11 @@ input {
     font-weight: bold;
 }
 
-/* Dividers */
 .divider {
     border-top: 1px solid #eee;
     margin: 10px 0;
 }
 
-/* Stats */
 .stats-row {
     font-size: 16px;
 }
@@ -277,10 +264,6 @@ input {
     font-family: monospace;
     font-size: 14px;
 }
-
-/* =========================
-   ITEM TABLE
-========================= */
 
 .filter-row {
     margin-bottom: 15px;
@@ -317,12 +300,10 @@ input {
     background: #f1f8f2;
 }
 
-/* Highlight recommendation */
 .item-table tr.highlight {
     background-color: #e8f5e9;
 }
 
-/* Recommendation box */
 .recommendation-text {
     margin-top: 15px;
     padding: 12px;
@@ -352,7 +333,6 @@ input {
     font-size: 16px;
 }
 
-/* Character list */
 .player-character-list {
     display: flex;
     flex-direction: column;
@@ -431,7 +411,6 @@ input {
     font-size: 14px;
 }
 
-/* Activity chart */
 .chart-card {
     background: white;
     padding: 20px;
@@ -440,7 +419,6 @@ input {
     box-shadow: 0 2px 5px rgba(0,0,0,0.08);
 }
 
-/* Recent sessions */
 .recent-sessions-table {
     width: 100%;
     border-collapse: collapse;
@@ -562,10 +540,6 @@ input {
     }
 }
 
-/* =========================
-   CHARACTER DETAIL PAGE
-========================= */
-
 .character-detail-page {
     max-width: 1150px;
     margin: 0 auto;
@@ -635,7 +609,6 @@ input {
     text-decoration: underline;
 }
 
-/* Section titles */
 .section-title {
     font-weight: 800;
     margin: 0;
@@ -647,7 +620,6 @@ input {
     margin: 10px 0 18px;
 }
 
-/* Ability scores */
 .ability-section-card {
     background: white;
     padding: 20px;
@@ -691,7 +663,6 @@ input {
     margin-top: 6px;
 }
 
-/* Stat cards */
 .character-stat-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -714,7 +685,6 @@ input {
     color: #333;
 }
 
-/* Growth chart */
 .chart-section {
     margin-top: 30px;
     margin-bottom: 30px;
@@ -729,7 +699,6 @@ input {
     height: 360px;
 }
 
-/* Inventory + spellbook */
 .asset-columns {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -796,7 +765,6 @@ input {
     margin: 8px 0 0;
 }
 
-/* Session history */
 .session-history-section {
     margin-bottom: 30px;
 }
@@ -828,7 +796,6 @@ input {
     background: #f1f8f2;
 }
 
-/* Shared links */
 .player-link,
 .character-link,
 .session-link {
@@ -843,7 +810,6 @@ input {
     text-decoration: underline;
 }
 
-/* Responsive */
 @media (max-width: 900px) {
     .ability-scores-grid {
         grid-template-columns: repeat(3, 1fr);
@@ -881,10 +847,6 @@ input {
         align-items: flex-start;
     }
 }
-
-/* =========================
-   ITEM DETAIL PAGE
-========================= */
 
 .item-detail-page {
     max-width: 1100px;
@@ -981,10 +943,6 @@ input {
         align-items: flex-start;
     }
 }
-
-/* =========================
-   SEARCH RESULTS PAGE
-========================= */
 
 .search-results-page {
     max-width: 1150px;
@@ -1329,10 +1287,6 @@ input {
     color: #555;
 }
 
-/* =========================
-   CLASS STATS PAGE
-========================= */
-
 .class-stats-page {
     max-width: 1150px;
     margin: 0 auto;
@@ -1549,10 +1503,6 @@ input {
     }
 }
 
-/* =========================
-   SPELL DISTRIBUTION PAGE
-========================= */
-
 .spell-distribution-page {
     max-width: 1150px;
     margin: 0 auto;
@@ -1644,5 +1594,259 @@ input {
 
     .spell-chart-card {
         height: 380px;
+    }
+}
+
+.species-breakdown-page {
+    max-width: 1150px;
+    margin: 0 auto;
+    padding: 24px;
+    background-color: #f4f4f4;
+}
+
+.species-breakdown-header,
+.species-filters-card,
+.species-quick-stats,
+.species-population-section,
+.species-heatmap-section,
+.species-tier-section,
+.species-characters-section,
+.species-insights-section {
+    margin-bottom: 28px;
+}
+
+.species-breakdown-header h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+.species-breakdown-subtitle {
+    color: #555;
+    margin-top: 12px;
+}
+
+.species-filters-card {
+    background: white;
+    border-left: 6px solid #2e7d32;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+
+.species-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+    gap: 18px 24px;
+    margin-top: 16px;
+}
+
+.checkbox-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.species-quick-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+}
+
+.quick-stat-card {
+    background: white;
+    border-left: 6px solid #2e7d32;
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+
+.quick-stat-label {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.quick-stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #222;
+}
+
+.species-chart-card {
+    height: 460px;
+    position: relative;
+}
+
+#speciesPopulationChart,
+#speciesTierChart {
+    width: 100% !important;
+    height: calc(100% - 48px) !important;
+    display: block;
+}
+.species-heatmap-section .chart-card {
+    overflow: visible;
+}
+
+.species-heatmap-container {
+    height: 45vh;
+    max-height: 450px;
+    min-height: 220px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: white;
+}
+
+.species-heatmap-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.species-heatmap-table th,
+.species-heatmap-table td {
+    border: 1px solid #eee;
+    padding: 10px;
+    text-align: center;
+    min-width: 80px;
+    white-space: nowrap;
+}
+
+.species-heatmap-table th {
+    background: #f9f9f9;
+    font-weight: 700;
+}
+
+.species-heatmap-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #f9f9f9;
+}
+
+.species-heatmap-table tbody th {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #f9f9f9;
+}
+
+.species-heatmap-table thead th:first-child {
+    left: 0;
+    z-index: 4;
+}
+
+.section-header-with-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.character-grid-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.selection-label {
+    color: #555;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.small-action-btn {
+    padding: 8px 12px;
+    border: 1px solid #cfcfcf;
+    border-radius: 999px;
+    background: white;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.small-action-btn:hover {
+    background: #f1f8f2;
+}
+
+.species-character-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.species-character-card {
+    background: white;
+    border-left: 6px solid #2e7d32;
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+
+.species-character-avatar {
+    width: 100%;
+    max-width: 90px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #ddd;
+    margin-bottom: 14px;
+}
+
+.species-character-player {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+.species-character-name {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.species-character-meta,
+.species-character-stats,
+.species-character-abilities {
+    color: #444;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.species-insights-list {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 1.9;
+    color: #444;
+}
+
+@media (max-width: 1000px) {
+    .species-character-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .species-filter-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .species-quick-stats {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .species-filter-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .species-character-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .species-chart-card {
+        height: 360px;
     }
 }

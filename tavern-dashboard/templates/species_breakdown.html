@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="species-breakdown-page">
+
+    <section class="species-breakdown-header">
+        <h1>Species Breakdown</h1>
+        <div class="section-rule thick"></div>
+        <p class="species-breakdown-subtitle">
+            Explore which species are most common, what classes they pair with, and how they are distributed across tiers.
+        </p>
+    </section>
+
+    <section class="species-filters-card">
+        <h2 class="section-title">FILTERS</h2>
+
+        <div class="species-filter-grid">
+            <div class="filter-group checkbox-group">
+                <label for="species-active-only">Active Only</label>
+                <input type="checkbox" id="species-active-only" checked>
+            </div>
+
+            <div class="filter-group">
+                <label for="species-tier-filter">Tier</label>
+                <select id="species-tier-filter">
+                    <option value="all">All</option>
+                    <option value="1">Tier 1</option>
+                    <option value="2">Tier 2</option>
+                    <option value="3">Tier 3</option>
+                    <option value="4">Tier 4</option>
+                </select>
+            </div>
+
+            <div class="filter-group filter-group-multi">
+                <label for="species-species-filter">Species</label>
+                <select id="species-species-filter" multiple></select>
+                <small>Hold Ctrl/Cmd to select multiple</small>
+            </div>
+
+            <div class="filter-group filter-group-multi">
+                <label for="species-class-filter">Class</label>
+                <select id="species-class-filter" multiple></select>
+                <small>Hold Ctrl/Cmd to select multiple</small>
+            </div>
+
+            <div class="filter-group">
+                <label for="species-date-from">Date Range</label>
+                <div class="date-range-row">
+                    <input type="date" id="species-date-from">
+                    <span>–</span>
+                    <input type="date" id="species-date-to">
+                </div>
+            </div>
+
+            <div class="filter-group filter-actions">
+                <button id="species-clear-filters" class="small-action-btn" type="button">Clear Filters</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="species-quick-stats">
+        <div class="quick-stat-card">
+            <div class="quick-stat-label">Species Count</div>
+            <div id="species-count-stat" class="quick-stat-value">0 represented</div>
+        </div>
+
+        <div class="quick-stat-card">
+            <div class="quick-stat-label">Most Common</div>
+            <div id="species-most-common-stat" class="quick-stat-value">-</div>
+        </div>
+
+        <div class="quick-stat-card">
+            <div class="quick-stat-label">Least Common Active</div>
+            <div id="species-least-common-stat" class="quick-stat-value">-</div>
+        </div>
+    </section>
+
+    <section class="species-population-section">
+        <div class="chart-card species-chart-card">
+            <h2 class="section-title">SPECIES POPULATION</h2>
+            <div class="section-rule"></div>
+            <canvas id="speciesPopulationChart"></canvas>
+        </div>
+    </section>
+
+    <section class="species-heatmap-section">
+        <div class="chart-card">
+            <h2 class="section-title">SPECIES × CLASS HEATMAP</h2>
+            <div class="section-rule"></div>
+            <div id="species-heatmap-container" class="species-heatmap-container"></div>
+            <p class="heatmap-note">Darker cell = more characters in that species/class combination.</p>
+        </div>
+    </section>
+
+    <section class="species-tier-section">
+        <div class="chart-card species-chart-card">
+            <h2 class="section-title">SPECIES DISTRIBUTION BY TIER</h2>
+            <div class="section-rule"></div>
+            <canvas id="speciesTierChart"></canvas>
+        </div>
+    </section>
+
+    <section class="species-characters-section">
+        <div class="section-header-with-actions">
+            <h2 class="section-title">CHARACTER GRID</h2>
+            <div class="character-grid-controls">
+                <span id="species-selection-label" class="selection-label">Showing all filtered characters</span>
+                <button id="species-clear-selection" class="small-action-btn" type="button">Clear Selection</button>
+            </div>
+        </div>
+        <div class="section-rule"></div>
+        <div id="species-character-grid" class="species-character-grid"></div>
+    </section>
+
+    <section class="species-insights-section">
+        <div class="chart-card">
+            <h2 class="section-title">INSIGHTS</h2>
+            <div class="section-rule"></div>
+            <ul id="species-insights-list" class="species-insights-list"></ul>
+        </div>
+    </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='species_breakdown.js') }}"></script>
+{% endblock %}
