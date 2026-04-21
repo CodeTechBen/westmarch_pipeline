@@ -79,7 +79,6 @@ resource "aws_subnet" "private_lambda" {
   }
 }
 
-# Public route table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -99,7 +98,6 @@ resource "aws_route_table_association" "public_assoc" {
   route_table_id = aws_route_table.public.id
 }
 
-# Private route table (to NAT instance)
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
@@ -108,7 +106,6 @@ resource "aws_route_table" "private" {
   }
 }
 
-# route to NAT instance added after NAT instance creation
 resource "aws_route_table_association" "private_data_assoc" {
   subnet_id      = aws_subnet.private_app_data.id
   route_table_id = aws_route_table.private.id
@@ -296,7 +293,6 @@ resource "aws_route" "private_default" {
   depends_on = [aws_instance.nat]
 }
 
-
 # ============================
 # DB EC2 (private)
 # ============================
@@ -344,11 +340,13 @@ resource "aws_instance" "app" {
   }
 
   user_data = templatefile("${path.module}/user_data_app.sh.tpl", {
-    db_host     = aws_instance.db.private_ip
-    db_name     = var.db_name
-    db_username = var.db_username
-    db_password = var.db_password
-    flask_port  = var.flask_port
+    db_host      = aws_instance.db.private_ip
+    db_name      = var.db_name
+    db_username  = var.db_username
+    db_password  = var.db_password
+    flask_port   = var.flask_port
+    domain_name  = var.domain_name
+    admin_email  = var.admin_email
   })
 
   depends_on = [aws_instance.db]
@@ -369,6 +367,26 @@ resource "aws_eip" "app" {
 resource "aws_eip_association" "app" {
   instance_id   = aws_instance.app.id
   allocation_id = aws_eip.app.id
+}
+
+# ============================
+# Route 53
+# ============================
+
+resource "aws_route53_record" "apex" {
+  zone_id = var.route53_zone_id
+  name    = var.domain_name
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.app.public_ip]
+}
+
+resource "aws_route53_record" "www" {
+  zone_id = var.route53_zone_id
+  name    = "www.${var.domain_name}"
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.app.public_ip]
 }
 
 # ============================
@@ -412,18 +430,18 @@ resource "aws_lambda_function" "pipeline" {
 
   environment {
     variables = {
-      DB_HOST     = aws_instance.db.private_ip
-      DB_NAME     = var.db_name
-      DB_USER     = var.db_username
-      DB_PASSWORD = var.db_password
-      WESTMARCH_URL = var.westmarch_url
-      WESTMARCH_ADVENTURES_URL=var.westmarch_adventures_url
-      DND_BEYOND_API=var.dnd_beyond_api
-      }
+      DB_HOST                    = aws_instance.db.private_ip
+      DB_NAME                    = var.db_name
+      DB_USER                    = var.db_username
+      DB_PASSWORD                = var.db_password
+      WESTMARCH_URL              = var.westmarch_url
+      WESTMARCH_ADVENTURES_URL   = var.westmarch_adventures_url
+      DND_BEYOND_API             = var.dnd_beyond_api
+    }
   }
 
   vpc_config {
-    subnet_ids = [aws_subnet.private_lambda.id]
+    subnet_ids         = [aws_subnet.private_lambda.id]
     security_group_ids = [aws_security_group.lambda.id]
   }
 

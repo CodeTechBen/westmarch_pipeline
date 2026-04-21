@@ -4,5 +4,6 @@
 *.txt
 *.tfvars
 *.tfstate
+*.backup
 *.hcl
 /terraform/.terraform

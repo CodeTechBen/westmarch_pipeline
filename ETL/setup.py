@@ -30,19 +30,34 @@ def setup_logging(output: str = None, level=logging.INFO): # type: ignore
         )
     logging.info("Logging setup complete.")
 
-def get_db_connection() -> psycopg2.extensions.connection:
+def get_db_connection(system: str) -> psycopg2.extensions.connection:
     '''Establishes a connection to the PostgreSQL database using environment variables.'''
-    try:
-        conn = psycopg2.connect(
-            dbname=ENV.get('DB_NAME'),
-            user=ENV.get('DB_USER'),
-            host=ENV.get('DB_HOST')
-        )
-        logging.info("Database connection established successfully.")
-        return conn
-    except DatabaseException as e:
-        logging.error(f"Failed to connect to the database: {e}")
-        raise
+    if system == "local":
+        try:
+            conn = psycopg2.connect(
+                dbname=ENV.get('DB_NAME'),
+                user=ENV.get('DB_USER'),
+                host=ENV.get('DB_HOST')
+            )
+            logging.info("Database connection established successfully.")
+            return conn
+        except DatabaseException as e:
+            logging.error(f"Failed to connect to the database: {e}")
+            raise
+    else:
+        try:
+            conn = psycopg2.connect(
+                dbname=ENV.get("DB_NAME"),
+                user=ENV.get("DB_USER"),
+                password=ENV.get("DB_PASSWORD"),
+                host=ENV.get("DB_HOST"),
+                port=ENV.get("DB_PORT", "5432")
+            )
+            logging.info("Database connection established successfully.")
+            return conn
+        except Exception as e:
+            logging.error(f"Failed to connect to the database: {e}")
+            raise
 
 if __name__ == "__main__":
     pass

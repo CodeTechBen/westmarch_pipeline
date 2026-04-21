@@ -21,3 +21,7 @@ output "scheduler_daily_name" {
 output "scheduler_wednesday_name" {
   value = aws_scheduler_schedule.wednesday_every_3_hours.name
 }
+
+output "route53_zone_id" {
+  value = var.route53_zone_id
+}

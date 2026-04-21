@@ -121,3 +121,15 @@ variable "westmarch_adventures_url" {
 variable "dnd_beyond_api" {
   type = string
 }
+
+variable "domain_name" {
+  type = string
+}
+
+variable "admin_email" {
+  type = string
+}
+
+variable "route53_zone_id" {
+  type = string
+}
