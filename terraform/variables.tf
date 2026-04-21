@@ -45,12 +45,12 @@ variable "nat_instance_type" {
 
 variable "app_root_volume_size" {
   type    = number
-  default = 20
+  default = 30
 }
 
 variable "db_root_volume_size" {
   type    = number
-  default = 20
+  default = 30
 }
 
 variable "ssh_public_key" {
@@ -108,4 +108,16 @@ variable "scheduler_timezone" {
 variable "daily_run_hour" {
   type    = number
   default = 9
+}
+
+variable "westmarch_url" {
+  type = string
+}
+
+variable "westmarch_adventures_url" {
+  type = string
+}
+
+variable "dnd_beyond_api" {
+  type = string
 }

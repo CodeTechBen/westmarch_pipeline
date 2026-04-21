@@ -416,7 +416,10 @@ resource "aws_lambda_function" "pipeline" {
       DB_NAME     = var.db_name
       DB_USER     = var.db_username
       DB_PASSWORD = var.db_password
-    }
+      WESTMARCH_URL = var.westmarch_url
+      WESTMARCH_ADVENTURES_URL=var.westmarch_adventures_url
+      DND_BEYOND_API=var.dnd_beyond_api
+      }
   }
 
   vpc_config {
