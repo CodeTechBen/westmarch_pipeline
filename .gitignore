@@ -2,3 +2,7 @@
 .env
 *.json
 *.txt
+*.tfvars
+*.tfstate
+*.hcl
+/terraform/.terraform
