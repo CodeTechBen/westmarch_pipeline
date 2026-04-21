@@ -9,25 +9,22 @@ RUN dnf install -y \
     gzip \
     gcc \
     postgresql-devel \
+    nss \
+    nspr \
     atk \
     cups-libs \
-    gtk3 \
+    alsa-lib \
     libXcomposite \
     libXcursor \
     libXdamage \
     libXext \
     libXi \
     libXrandr \
-    libXScrnSaver \
-    libXtst \
-    pango \
-    alsa-lib \
     libXfixes \
-    nss \
-    nspr \
+    libXtst \
     mesa-libgbm \
-    xorg-x11-fonts-Type1 \
-    xorg-x11-fonts-misc \
+    pango \
+    gtk3 \
     && dnf clean all
 
 # Copy requirements first for caching
