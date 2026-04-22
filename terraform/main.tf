@@ -427,6 +427,10 @@ resource "aws_lambda_function" "pipeline" {
   image_uri     = var.lambda_image_uri
   timeout       = var.lambda_timeout
   memory_size   = var.lambda_memory_size
+  
+  ephemeral_storage {
+    size = 1024
+  }
 
   environment {
     variables = {
