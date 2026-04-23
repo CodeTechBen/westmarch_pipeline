@@ -1,4 +1,12 @@
 #!/bin/bash
+set -euxo pipefail
+
+dnf update -y
+dnf install -y postgresql15-server postgresql15 amazon-ssm-agent
+
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+
 set -eux
 
 dnf update -y

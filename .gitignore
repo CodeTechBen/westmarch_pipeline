@@ -7,3 +7,5 @@
 *.backup
 *.hcl
 /terraform/.terraform
+terraform-key
+terraform-key.*

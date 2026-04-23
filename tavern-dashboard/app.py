@@ -35,7 +35,7 @@ def index():
 
 @app.route("/api/stats")
 def stats():
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM character;")
@@ -59,7 +59,7 @@ def stats():
 
 @app.route("/api/sessions")
 def sessions():
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     cur.execute("""
@@ -82,7 +82,7 @@ def sessions():
 
 @app.route("/api/class-distribution")
 def class_distribution():
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     cur.execute("""
@@ -111,7 +111,7 @@ def search():
     if not q:
         return jsonify([])
 
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     query = f"%{q}%"
@@ -214,7 +214,7 @@ def full_search():
             "available_tags": []
         })
 
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     query = f"%{q}%"
@@ -402,7 +402,7 @@ def full_search():
 
 @app.route("/api/sessions/list")
 def session_list():
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     offset = request.args.get("offset", 0, type=int)
@@ -443,7 +443,7 @@ def session_list():
 
 @app.route("/api/dms")
 def get_dms():
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     cur.execute("""
@@ -467,7 +467,7 @@ def sessions_page():
 
 @app.route("/api/session/<int:session_id>")
 def session_detail_api(session_id):
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     cur.execute("""
@@ -629,7 +629,7 @@ def session_detail_api(session_id):
 
 @app.route("/api/spell/<int:spell_id>")
 def spell_detail_api(spell_id):
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     cur.execute("""
@@ -758,7 +758,7 @@ def player_detail_page(player_id):
 
 @app.route("/api/player/<int:player_id>")
 def player_detail_api(player_id):
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     cur.execute("""
@@ -953,7 +953,7 @@ def character_detail_page(character_id):
 
 @app.route("/api/character/<int:character_id>")
 def character_detail_api(character_id):
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     cur.execute(f"""
@@ -1230,7 +1230,7 @@ def item_detail_page(item_id):
 
 @app.route("/api/item/<int:item_id>")
 def item_detail_api(item_id):
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     cur.execute("""
@@ -1370,7 +1370,7 @@ def item_distribution_api():
     if value_mode not in ("gold", "items", "both"):
         value_mode = "gold"
 
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     filters = []
@@ -1727,7 +1727,7 @@ def class_stats_api():
     tier = request.args.get("tier", "all").strip().lower()
     active_only = request.args.get("active_only", "true").lower() == "true"
 
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     filters = []
@@ -1921,7 +1921,7 @@ def spell_distribution_api():
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
 
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     params = []
@@ -2326,7 +2326,7 @@ def species_breakdown_api():
     selected_species = [s.strip() for s in request.args.getlist("species") if s.strip()]
     selected_classes = [c.strip() for c in request.args.getlist("class") if c.strip()]
 
-    conn = get_connection()
+    conn = get_connection("")
     cur = conn.cursor()
 
     filters = []

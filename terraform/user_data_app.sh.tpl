@@ -1,16 +1,19 @@
 #!/bin/bash
-set -eux
+set -euxo pipefail
+exec > >(tee /var/log/app-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
 
 dnf update -y
 dnf install -y \
   python3 python3-pip python3-devel \
-  git nginx gcc postgresql-devel \
-  certbot python3-certbot-nginx
+  git nginx gcc postgresql-devel postgresql15 \
+  certbot python3-certbot-nginx amazon-ssm-agent
+
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
 
 mkdir -p /opt/tavern
 cd /opt/tavern
 
-# Clone repo fresh
 if [ -d /opt/tavern/repo ]; then
   rm -rf /opt/tavern/repo
 fi
@@ -19,20 +22,17 @@ git clone https://github.com/CodeTechBen/westmarch_pipeline.git repo
 
 cd /opt/tavern/repo/tavern-dashboard
 
-# Python virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
 pip install --upgrade pip
 
-# Install requirements if present, otherwise install core deps
 if [ -f requirements.txt ]; then
     pip install -r requirements.txt
 else
     pip install flask gunicorn psycopg2-binary python-dotenv
 fi
 
-# Environment file for app/db.py
 cat > /opt/tavern/repo/tavern-dashboard/.env <<EOF
 DB_HOST=${db_host}
 DB_NAME=${db_name}
@@ -41,7 +41,11 @@ DB_PASSWORD=${db_password}
 FLASK_PORT=${flask_port}
 EOF
 
-# Gunicorn systemd service
+until PGPASSWORD='${db_password}' psql -h ${db_host} -U ${db_username} -d ${db_name} -c '\q'; do
+  echo "Waiting for database..."
+  sleep 5
+done
+
 cat >/etc/systemd/system/tavern.service <<EOF
 [Unit]
 Description=Tavern Flask App
@@ -58,7 +62,6 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-# Initial nginx config for HTTP only
 cat >/etc/nginx/conf.d/tavern.conf <<EOF
 server {
     listen 80;
@@ -82,7 +85,6 @@ systemctl restart tavern
 systemctl enable nginx
 systemctl restart nginx
 
-# Helper script: wait until DNS points at this server, then request cert
 cat >/usr/local/bin/bootstrap-cert.sh <<EOF
 #!/bin/bash
 set -eux
@@ -130,7 +132,6 @@ ExecStart=/usr/local/bin/bootstrap-cert.sh
 WantedBy=multi-user.target
 EOF
 
-# Cert renewal timer
 cat >/etc/systemd/system/tavern-cert-renew.service <<EOF
 [Unit]
 Description=Renew Let's Encrypt certificates

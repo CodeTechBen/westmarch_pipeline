@@ -304,6 +304,8 @@ resource "aws_instance" "db" {
   key_name               = aws_key_pair.main.key_name
 
   associate_public_ip_address = false
+  iam_instance_profile        = aws_iam_instance_profile.ec2_ssm_profile.name
+  user_data_replace_on_change = true
 
   root_block_device {
     volume_size = var.db_root_volume_size
@@ -321,7 +323,38 @@ resource "aws_instance" "db" {
   tags = {
     Name = "${var.project_name}-db"
   }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.ssm_core
+  ]
 }
+
+resource "aws_iam_role" "ec2_ssm" {
+  name = "${var.project_name}-ec2-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.ec2_ssm.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_ssm_profile" {
+  name = "${var.project_name}-ec2-ssm-profile"
+  role = aws_iam_role.ec2_ssm.name
+}
+
+
 
 # ============================
 # App EC2 (public Flask)
@@ -333,6 +366,9 @@ resource "aws_instance" "app" {
   vpc_security_group_ids      = [aws_security_group.app.id]
   key_name                    = aws_key_pair.main.key_name
   associate_public_ip_address = true
+
+  iam_instance_profile        = aws_iam_instance_profile.ec2_ssm_profile.name
+  user_data_replace_on_change = true
 
   root_block_device {
     volume_size = var.app_root_volume_size
@@ -349,7 +385,10 @@ resource "aws_instance" "app" {
     admin_email  = var.admin_email
   })
 
-  depends_on = [aws_instance.db]
+  depends_on = [
+    aws_instance.db,
+    aws_iam_role_policy_attachment.ssm_core
+  ]
 
   tags = {
     Name = "${var.project_name}-app"
